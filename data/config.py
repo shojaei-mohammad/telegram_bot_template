@@ -40,7 +40,7 @@ MY_SQL = {
     "user": env.str("MYSQL_USER"),
     "password": env.str("MYSQL_PASSWORD"),
     "host": env.str("MYSQL_HOST"),
-    "port": env.str("MYSQL_PORT"),
+    "port": env.int("MYSQL_PORT"),
     "database": env.str("MYSQL_DATABASE"),
 }
 
