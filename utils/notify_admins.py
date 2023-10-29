@@ -3,7 +3,7 @@ from data.config import ADMINS
 
 from utils.logger import configure_logger
 
-logger = configure_logger()
+logger = configure_logger(f"{__name__}.log")
 
 
 async def start_up_notification(dp: Dispatcher) -> None:
