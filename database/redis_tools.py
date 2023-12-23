@@ -10,14 +10,15 @@ to establish and terminate the connection, respectively.
 
 Note: Ensure that Redis server is running and reachable at the specified REDIS_URL.
 """
+import json
 from typing import Optional, Any
 
 import aioredis
 
 from data import config
-from utils.logger import configure_logger
+from utils.logger import LoggerSingleton
 
-logger = configure_logger(f"{__name__}.log")
+logger = LoggerSingleton.get_logger()
 
 # Create a global Redis pool. We'll initialize this in the app startup.
 redis: Optional[aioredis.Redis] = None
@@ -55,21 +56,33 @@ async def close_redis():
             raise
 
 
-async def set_shared_data(chat_id: int, key: str, value: Any) -> None:
+async def set_shared_data(
+    chat_id: int,
+    key: str,
+    value: Any,
+    cache_time: int = 86400,
+    persistent: bool = False,
+) -> None:
     """
-    Store data associated with a chat_id and key in Redis.
+    Store data associated with a chat_id and key in Redis with an optional expiration time.
 
     Args:
         chat_id (int): Identifier for the chat session.
         key (str): The key under which data is stored.
         value (Any): The data to be stored.
+        cache_time (int, optional): Expiration time in seconds. Defaults to 86400 seconds (24 hours).
+        persistent (bool, optional): If True, the data will be persistent and not expire. Defaults to False.
 
     Raises:
         aioredis.RedisError: If there's an issue setting data in Redis.
     """
     redis_key = f"{chat_id}:{key}"
     try:
-        await redis.set(redis_key, str(value))
+        serialized_value = json.dumps(value)
+        if persistent:
+            await redis.set(redis_key, serialized_value)
+        else:
+            await redis.setex(redis_key, cache_time, serialized_value)
     except aioredis.RedisError as e:
         logger.error(f"Error setting data for key '{redis_key}': {e}")
         raise
@@ -93,7 +106,8 @@ async def get_shared_data(chat_id: int, key: str) -> Optional[Any]:
     try:
         value = await redis.get(redis_key)
         if value is not None:
-            return value.decode("utf-8")
+            deserialized_value = json.loads(value.decode("utf-8"))
+            return deserialized_value
         return None
     except aioredis.RedisError as e:
         logger.error(f"Error fetching data for key '{redis_key}': {e}")

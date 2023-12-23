@@ -28,9 +28,9 @@ from aiogram.types import CallbackQuery
 
 from keyboards.inline.main_menu import menu_structure, create_markup
 from loader import bot, dp
-from utils.logger import configure_logger
+from utils.logger import LoggerSingleton
 
-logger = configure_logger(f"{__name__}.log")
+logger = LoggerSingleton.get_logger()
 
 
 @dp.callback_query_handler(lambda call: True, state=None)
