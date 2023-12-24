@@ -47,10 +47,6 @@ MY_SQL = {
 # Redis database URL
 REDIS_URL = env.str("REDIS_URL")
 
-# Channel configurations
-FORCE_CHANNEL_JOIN = env.bool(
-    "FORCE_CHANNLE_JOIN"
-)  # Whether to force users to join a specific channel.
 CHANNEL_LINK = env.str("CHANNEL_LINK")  # Link to the channel users are directed to.
 CHANNEL_ID = env.str("CHANNEL_ID")  # ID of the channel users are directed to.
 

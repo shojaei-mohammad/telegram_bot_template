@@ -61,7 +61,7 @@ async def edit_or_send_new(
     Returns:
     - None: The function does not return any value, but it has side effects on the Telegram chat.
     """
-    last_msg_id = await db_utils.get_last_bot_message_id(chat_id)
+    last_msg_id = await db_utils.get_last_message_id(chat_id)
     # Obtain a lock for the given chat_id to ensure synchronous access
     get_lock = await get_chat_id_lock(chat_id)
     async with get_lock:
@@ -76,9 +76,7 @@ async def edit_or_send_new(
             message_id = last_message.message_id
 
             # Store the new message's ID in the database for future reference
-            await db_utils.store_message_id(
-                chat_id=chat_id, message_id=message_id, is_bot=True
-            )
+            await db_utils.store_message_id(chat_id=chat_id, message_id=message_id)
         else:
             try:
                 # Try to edit the existing message
@@ -109,9 +107,7 @@ async def edit_or_send_new(
                 message_id = last_message.message_id
 
                 # Store the new message's ID in the database for future reference
-                await db_utils.store_message_id(
-                    chat_id=chat_id, message_id=message_id, is_bot=True
-                )
+                await db_utils.store_message_id(chat_id=chat_id, message_id=message_id)
 
 
 async def get_chat_id_lock(chat_id: int) -> asyncio.Lock:

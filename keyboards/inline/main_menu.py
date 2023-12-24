@@ -43,7 +43,7 @@ menu_structure = {
         "row_width": [1, 2, 3, 1],
         "menu_type": "user",
         "options": [
-            {"text": "🤑کسب درآمد", "callback_data": "my_profile"},
+            {"text": "🤑کسب درآمد", "callback_data": "earning"},
             {"text": "💳 شارژ کیف پول", "callback_data": "user_wallet_recharge"},
             {"text": "🛍 خرید سرویس", "callback_data": "view_plans"},
             {"text": "☎️ پشتیبانی", "callback_data": "support"},

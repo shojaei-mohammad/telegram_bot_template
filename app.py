@@ -21,8 +21,8 @@ from aiogram import executor
 
 from database.redis_tools import initialize_redis, close_redis
 from handlers import initialize_handlers
-from loader import dp, db_utils, config
-from middlewares import throttling, is_joined_channel
+from loader import dp, db_utils
+from middlewares import throttling, check_subscription
 from utils.notify_admins import start_up_notification, shut_down_notification
 from utils.set_bot_commands import set_default_commands
 
@@ -67,6 +67,7 @@ async def on_shutdown(dispatcher):
 # Setting up the middleware for request throttling. This prevents users from
 # spamming the bot with too many requests in a short time span.
 dp.middleware.setup(throttling.ThrottlingMiddleware())
+dp.middleware.setup(check_subscription.CheckUserSubscription())
 
 # setting up middleware to see if the user is joind the channel or not
 # If the value of "FORCE_CHANNLE_JOIN" in the .env set to yes it forces the user
