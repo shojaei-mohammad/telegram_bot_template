@@ -14,17 +14,21 @@ Utility Functions:
 - `ask_for_language_selection`: Present the language selection menu to users.
 - `register_user`: Register user details into the database.
 """
+import traceback
+import uuid
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandStart
-from aiogram.types import CallbackQuery
+from aiogram.utils.exceptions import TelegramAPIError
 
+from data.config import BASE_REFERRAL_LINK
+from database.redis_tools import set_shared_data
 from keyboards.inline.main_menu import create_markup
-from loader import dp, bot, db_utils, config
-from utils import logger
+from loader import dp, bot, db_utils
+from utils.logger import LoggerSingleton
 
-logger = logger.configure_logger("registration_handler.log")
+logger = LoggerSingleton.get_logger()
 
 
 @dp.message_handler(CommandStart(deep_link=None))
@@ -43,52 +47,145 @@ async def bot_start(message: types.Message, state: FSMContext) -> None:
         None
     """
     chat_id = message.chat.id
+    name = message.chat.first_name
+    last_name = message.chat.last_name
+    username = message.chat.username
     args = message.get_args()
     referrer_id = None
     if args:
-        referrer_id = args.split("-")[1]
+        referrer_id = args.replace("REF-", "")
 
-    await state.set_data({"referrer_id": referrer_id})
-    menu, text = await create_markup(menu_key="users_main_menu")
-    last_msg = await bot.send_message(text=text, chat_id=chat_id, reply_markup=menu)
-    await db_utils.store_message_id(message.chat.id, last_msg.message_id, is_bot=True)
+    try:
+        # Check if the user exists in the BotUsers table
+        user_exists = await db_utils.check_user_exists(chat_id=chat_id)
+        if user_exists:
+            logger.info(f"Chat-id {chat_id} has already registered.")
+            markup, menu_text = await create_markup(menu_key="users_main_menu")
+            # Send the message with the appropriate menu
+            last_msg = await bot.send_message(
+                chat_id=chat_id, text=menu_text, reply_markup=markup
+            )
+            await db_utils.store_message_id(chat_id, last_msg.message_id)
+
+        elif message.text == "/start" or str(args).startswith("REF"):
+            logger.info(
+                f"New user detected, Going through registration for Chat-id: {chat_id}"
+            )
+            if referrer_id:
+                logger.info(
+                    f"User came in with referral link, referred by: {referrer_id}"
+                )
+                check_referrer_query = (
+                    "SELECT COUNT(*) FROM BotUsers WHERE ReferralCode = %s"
+                )
+                (referrer_count,) = await db_utils.fetch_data(
+                    query=check_referrer_query, params=(referrer_id,), fetch_one=True
+                )
+
+                if referrer_count == 0:
+                    await message.reply(
+                        text="🌌 اوپس! به نظر می‌رسد لینک معرف شما از کهکشان راه شیری خارج شده. لطفا دوباره بررسی "
+                        "کنید و با یک لینک صحیح به سیاره ما بازگردید!"
+                    )
+                    return
+                else:
+                    await set_shared_data(
+                        chat_id=chat_id, key="referrer_id", value=referrer_id
+                    )
+                    logger.info(
+                        f"Chat-id:{chat_id} started the bot via referral link, Referred By: {referrer_id}"
+                    )
+                    await register_user(
+                        chat_id=chat_id,
+                        name=name,
+                        lastname=last_name,
+                        username=username,
+                        referrer_id=referrer_id,
+                    )
+                    menu, text = await create_markup(menu_key="users_main_menu")
+                    last_msg = await bot.send_message(
+                        text=text, chat_id=chat_id, reply_markup=menu
+                    )
+                    await db_utils.store_message_id(
+                        message.chat.id, last_msg.message_id
+                    )
+            else:
+                logger.info("User came in with regullar start")
+                await register_user(
+                    chat_id=chat_id,
+                    name=name,
+                    lastname=last_name,
+                    username=username,
+                    referrer_id=referrer_id,
+                )
+                menu, text = await create_markup(menu_key="users_main_menu")
+                last_msg = await bot.send_message(
+                    text=text, chat_id=chat_id, reply_markup=menu
+                )
+                await db_utils.store_message_id(message.chat.id, last_msg.message_id)
+
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        logger.error(f"An unexpected error occurred: {e}\n{error_traceback}")
 
 
-@dp.callback_query_handler(lambda call: call.data == "joined")
-async def handle_subscription(call: CallbackQuery) -> None:
+async def register_user(
+    chat_id: int, name: str, lastname: str, username: str, referrer_id: str = None
+) -> None:
     """
-    Check if a user has joined the required channel.
-
-    If the user has joined the channel, initiate the registration process.
+    Register a user in the database.
 
     Args:
-        call (CallbackQuery): The callback object containing the user's interaction details.
+        chat_id (int): User's chat ID.
+        name (str): User's first name.
+        lastname (str): User's last name.
+        username (str): User's username.
+        referrer_id (str, optional): Referral token (if available)
 
     Returns:
         None
     """
-    channel_id = config.CHANNEL_ID
-    chat_id = call.message.chat.id
-    chat_member = await bot.get_chat_member(channel_id, chat_id)
-    # Check if the chat id exists in the users table
-    query = "SELECT COUNT(*) FROM Users WHERE ChatID=%s"
-    user_exists = await db_utils.fetch_data(query, (chat_id,), fetch_one=True)
-    if user_exists[0] > 0 and chat_member.status in [
-        "member",
-        "creator",
-        "administrator",
-    ]:
-        await call.message.delete()
-        await bot.answer_callback_query(call.id)
-        menu, text = await create_markup(menu_key="users_main_menu")
-        await bot.send_message(
-            text=text, chat_id=call.message.chat.id, reply_markup=menu
+    id_parts = str(uuid.uuid4()).split("-")
+    referral_code = "-".join(id_parts[:2])
+    referral_link = BASE_REFERRAL_LINK + referral_code
+
+    try:
+        # SQL query to insert a new user into the table
+        registration_query = """
+        INSERT INTO BotUsers (ChatID, Name, Lastname, Username, ReferralCode, ReferredBy, ReferralLink)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+
+        # Parameters for the SQL query
+        params = (
+            chat_id,
+            name,
+            lastname,
+            username,
+            referral_code,
+            referrer_id,
+            referral_link,
         )
+        await db_utils.execute_query(registration_query, params)
+        logger.info(f"The user with {chat_id} registered successfully")
 
-    elif chat_member.status in ["member", "creator", "administrator"]:
-        await call.message.delete()
-        await bot.answer_callback_query(call.id)
-        # handle the action after the user subscribed to channel
+        # Update the refferer count
+        if referrer_id:
+            update_referral_count_query = """
+            UPDATE BotUsers SET ReferralCount = ReferralCount + 1 WHERE ReferralCode = %s
+            """
+            await db_utils.execute_query(update_referral_count_query, (referrer_id,))
+            logger.info(
+                f"The Referral count increased for user with referral code: {referrer_id}"
+            )
 
-    else:
-        await call.answer("لطفادر کانال عضو شوید.")
+    except TelegramAPIError as e:
+        error_traceback = traceback.format_exc()
+        logger.error(
+            f"An unexpected API error occurred while registering the user: {e}\n{error_traceback}"
+        )
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        logger.error(
+            f"An unexpected error occurred while registering the user: {e}\n{error_traceback}"
+        )

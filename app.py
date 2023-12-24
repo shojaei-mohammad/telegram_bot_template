@@ -70,9 +70,7 @@ dp.middleware.setup(throttling.ThrottlingMiddleware())
 
 # setting up middleware to see if the user is joind the channel or not
 # If the value of "FORCE_CHANNLE_JOIN" in the .env set to yes it forces the user
-# to join the specified channel.
-if config.FORCE_CHANNEL_JOIN:
-    dp.middleware.setup(is_joined_channel.ForceChannelJoinMiddleware())
+
 
 print("BOT is running ...")
 

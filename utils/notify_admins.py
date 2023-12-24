@@ -1,9 +1,8 @@
 from aiogram import Dispatcher
 from data.config import ADMINS
+from utils.logger import LoggerSingleton
 
-from utils.logger import configure_logger
-
-logger = configure_logger(f"{__name__}.log")
+logger = LoggerSingleton.get_logger()
 
 
 async def start_up_notification(dp: Dispatcher) -> None:

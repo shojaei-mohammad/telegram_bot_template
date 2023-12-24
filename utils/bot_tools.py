@@ -25,11 +25,10 @@ from aiogram.utils.exceptions import (
 )
 
 from loader import bot, db_utils
+from utils.logger import LoggerSingleton
 
-from utils.logger import configure_logger
+logger = LoggerSingleton.get_logger()
 
-
-logger = configure_logger(f"{__name__}.log")
 # Dictionary to keep the chat id's lock in memory
 chat_id_locks = {}
 

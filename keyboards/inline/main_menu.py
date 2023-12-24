@@ -33,28 +33,32 @@ from typing import Tuple, Optional, Any
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
+from data.config import CHANNEL_LINK
 from loader import config
 
 SUPPORT_USERNAME = config.SUPPORT_USER_NAME
-
-
 menu_structure = {
     "users_main_menu": {
-        "text_key": "menus.users_main_menu",
-        "row_width": [1, 2, 2, 2, 1],
+        "text": "📁 به پنل کاربری خوش آمدید. یکی از موارد زیر را انتخاب کنید.",
+        "row_width": [1, 2, 3, 1],
         "menu_type": "user",
         "options": [
-            {"text_key": "menus.my_profile", "callback_data": "my_profile"},
-            {"text_key": "menus.buy_subscription", "callback_data": "view_plans"},
-            {
-                "text_key": "menus.wallet_recharge",
-                "callback_data": "user_wallet_recharge",
-            },
-            {"text_key": "menus.my_subscriptions", "callback_data": "my_subscriptions"},
-            {"text_key": "menus.support", "url": f"{SUPPORT_USERNAME}"},
-            {"text_key": "menus.referrals", "callback_data": "my_referrals"},
-            {"text_key": "menus.how_tos", "callback_data": "how_to's"},
-            {"text_key": "menus.select_lang", "callback_data": "select_lang"},
+            {"text": "🤑کسب درآمد", "callback_data": "my_profile"},
+            {"text": "💳 شارژ کیف پول", "callback_data": "user_wallet_recharge"},
+            {"text": "🛍 خرید سرویس", "callback_data": "view_plans"},
+            {"text": "☎️ پشتیبانی", "callback_data": "support"},
+            {"text": "📚 ‌آموزش‌ها", "callback_data": "how_to's"},
+            {"text": "📂 سرویس های من", "callback_data": "my_services"},
+            {"text": "🤗 عضویت در کانال اطلاع رسانی", "url": f"{CHANNEL_LINK}"},
+        ],
+    },
+    "how_to's": {
+        "text": "یکی از موارد زیر را انتخاب کنید:",
+        "back": "users_main_menu",
+        "menu_type": "user",
+        "options": [
+            {"text": "📱 نرم افزارها", "callback_data": "softwares_menu"},
+            {"text": "📚 راهنما", "callback_data": "guids"},
         ],
     },
 }
@@ -93,24 +97,20 @@ async def create_markup(menu_key: str) -> Tuple[Any, Optional[str]]:
         return None, None
 
     options = menu["options"]
-    menu_text = menu["text_key"]
+    menu_text = menu["text"]
     menu_type = menu.get("menu_type")
     # Use the row_width from menu structure, or default if not present
     row_width = menu.get("row_width", default_row_width)
     # Create markup for the menu options
     buttons = []
     for option in options:
-        translated_text = option["text_key"]
+        text = f"{option['text']}"
         if "url" in option:
-            item = InlineKeyboardButton(translated_text, url=option["url"])
+            item = InlineKeyboardButton(text, url=option["url"])
         elif "web_app" in option:
-            item = InlineKeyboardButton(
-                translated_text, web_app=WebAppInfo(url=option["web_app"])
-            )
+            item = InlineKeyboardButton(text, web_app=WebAppInfo(url=option["web_app"]))
         else:
-            item = InlineKeyboardButton(
-                translated_text, callback_data=option["callback_data"]
-            )
+            item = InlineKeyboardButton(text, callback_data=option["callback_data"])
         buttons.append(item)
 
     # Break the buttons into rows based on the row_width list
@@ -146,6 +146,3 @@ async def create_markup(menu_key: str) -> Tuple[Any, Optional[str]]:
         markup.add(main_menu_button)
 
     return markup, menu_text
-
-
-__all__ = ["create_markup", "menu_structure"]

@@ -23,42 +23,36 @@ Note: Before using this module, make sure the required configurations are set in
 and the log file path is correctly configured in the `utils.logger` module.
 """
 
-import asyncio
 import traceback
 from typing import Optional, Union, Tuple, List, Any
 
 import aiomysql
 
 from data import config
-from utils.logger import configure_logger
+from utils.logger import LoggerSingleton
 
-logger = configure_logger(f"{__name__}.log")
+# Configure the logger
+logger = LoggerSingleton.get_logger()
 
 
 class DBUtil:
+    _instance = None  # Private variable to store the instance
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:  # Corrected the 'if' condition
+            cls._instance = super(DBUtil, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self):
-        self.host = config.MY_SQL["host"]
-        self.db_name = config.MY_SQL["database"]
-        self.db_username = config.MY_SQL["user"]
-        self.db_password = config.MY_SQL["password"]
-        self.port = config.MY_SQL["port"]
-        self.pool = None
-        self.locks = {}
-
-    async def get_lock(self, chat_id: int) -> asyncio.locks.Lock:
-        """
-        This function returns a lock for a given chat_id.
-        If a lock for the chat_id does not exist, it creates a new one.
-
-        :param chat_id: the unique identifier of the chat
-        :type chat_id: int
-        :return: asyncio.locks.Lock object associated with the given chat_id
-        :rtype: asyncio.locks.Lock
-        """
-
-        if chat_id not in self.locks:
-            self.locks[chat_id] = asyncio.Lock()
-        return self.locks[chat_id]
+        if not hasattr(self, "initialized"):
+            self.host = config.MY_SQL["host"]
+            self.db_name = config.MY_SQL["database"]
+            self.db_username = config.MY_SQL["user"]
+            self.db_password = config.MY_SQL["password"]
+            self.port = config.MY_SQL["port"]
+            self.pool = None
+            self.locks = {}
+            self.initialized = True
 
     async def _create_pool(self) -> None:
         """
@@ -78,6 +72,7 @@ class DBUtil:
             db=self.db_name,
             autocommit=False,
         )
+        logger.info(f"New pool for {self.db_name} has been created.")
 
     async def execute_query(
         self,
@@ -85,41 +80,50 @@ class DBUtil:
         params: Optional[Union[Tuple, None]] = None,
         is_transaction: bool = False,
         fetch_last_insert_id: bool = False,
-    ) -> Union[None, int]:
+        batch_mode: bool = False,
+        batch_params: Optional[List[Tuple]] = None,
+    ) -> Union[None, int, List[int]]:
         """
         Executes the provided query using the given parameters.
 
-        :param query: The SQL query to be executed
-        :param params: A tuple containing the parameters for the query
-        :param is_transaction: Whether the query is a part of a transaction
-        :param fetch_last_insert_id: Whether to fetch the last inserted ID
-        :return: None or the last inserted ID if fetch_last_insert_id is True
+        :param query: The SQL query to be executed.
+        :param params: A tuple containing the parameters for the query.
+        :param is_transaction: Whether the query is a part of a transaction.
+        :param fetch_last_insert_id: Whether to fetch the last inserted ID.
+        :param batch_mode: If True, executes multiple queries in batch.
+        :param batch_params: A list of tuples containing parameters for batch execution.
+        :return: None, the last inserted ID, or a list of last inserted IDs if in batch mode.
         """
         async with self.pool.acquire() as conn:
-            # If it's a transaction, begin the transaction
             if is_transaction:
                 await conn.begin()
             async with conn.cursor() as cursor:
                 try:
-                    await cursor.execute(query, params)
-                    logger.info(f"Running query: {query} with params: {params}")
-
-                    # If it's a transaction, commit it. If not, just commit the query.
-                    if is_transaction:
-                        await conn.commit()
+                    if batch_mode and batch_params:
+                        await cursor.executemany(query, batch_params)
+                        logger.info(
+                            f"Batch executing query: {query} with params: {batch_params}"
+                        )
                     else:
-                        # Decide here if you want to commit every regular query.
-                        # It might be better to leave this out if you run many small operations in a row.
+                        await cursor.execute(query, params)
+                        logger.info(f"Running query: {query} with params: {params}")
+
+                    if not is_transaction:
                         await conn.commit()
 
                     if fetch_last_insert_id:
-                        return cursor.lastrowid  # return the last inserted id
+                        if batch_mode:
+                            return [
+                                cursor.lastrowid for _ in batch_params
+                            ]  # List of IDs
+                        return cursor.lastrowid  # Single ID
+
                 except Exception as e:
                     logger.error(
                         f"An error occurred while executing the query: {e}\n{traceback.format_exc()}"
                     )
-                    # If there's an error, rollback the transaction (or query)
-                    await conn.rollback()
+                    if is_transaction:
+                        await conn.rollback()
                     raise
 
     async def fetch_data(
@@ -149,46 +153,100 @@ class DBUtil:
                     logger.error(f"An error occurred: {e}\n{traceback.format_exc()}")
                     return None
 
-    async def store_message_id(
-        self, chat_id: int, message_id: int, is_bot: bool
-    ) -> None:
+    async def check_user_exists(self, chat_id: int) -> bool:
         """
-        This function stores the message id in the database.
-        """
-        key = "bot_message_id" if is_bot else "user_message_id"
-        query = """
-            INSERT INTO MessageIds (ChatId, MessageId, KeyId)
-            VALUES (%s, %s, %s) AS new
-            ON DUPLICATE KEY UPDATE MessageId = new.MessageId, KeyId = new.KeyId
-        """
+        Checks whether a user exists in the BotUsers table based on the chat ID.
 
-        await self.execute_query(query, (chat_id, message_id, key))
+        This function performs a database query to check if there's an entry
+        for the given chat ID in the BotUsers table. It returns True if the user
+        exists, otherwise False.
 
-    async def get_last_bot_message_id(self, chat_id: int) -> Optional[int]:
+        Args:
+            chat_id (int): The unique chat ID of the Telegram user.
+
+        Returns:
+            bool: True if the user exists in the BotUsers table, False otherwise.
         """
-        Given a chat id, this function fetches the last message id of the bot from the database.
-        If there's no such entry, None is returned.
+        try:
+            # Query to check if the user exists in the BotUsers table
+            query = "SELECT COUNT(*) FROM BotUsers WHERE ChatID = %s"
+            params = (chat_id,)
+
+            # Execute the query
+            (count,) = await self.fetch_data(query, params, fetch_one=True)
+
+            # If the count is greater than 0, user exists
+            return count > 0
+
+        except Exception as err:
+            # Log any exceptions that occur
+            logger.error(f"Error checking user existence for ChatID {chat_id}: {err}")
+            # Re-raise the exception for further handling, or return False
+            raise err
+
+    # Store Message ID
+    async def store_message_id(self, chat_id: int, message_id: int) -> None:
         """
+        Stores the message ID in both Redis and MySQL.
+        """
+        # Lazy import to avoid circular dependency
+        from database.redis_tools import set_shared_data
+
+        # Store in Redis
+        await set_shared_data(chat_id, "last_message_id", message_id, persistent=True)
+
+        # Store in MySQL
         query = """
-                SELECT MessageId FROM MessageIds
-                WHERE ChatId = %s AND KeyId = 'bot_message_id'
+            INSERT INTO MessageIds (ChatId, MessageId)
+            VALUES (%s, %s) AS new
+            ON DUPLICATE KEY UPDATE MessageId = new.MessageId
         """
+        await self.execute_query(query, (chat_id, message_id))
+
+    async def get_last_message_id(self, chat_id: int) -> Optional[int]:
+        """
+        Retrieves the last message ID from Redis, falling back to MySQL if necessary.
+        """
+        # Lazy import to avoid circular dependency
+        from database.redis_tools import get_shared_data, set_shared_data
+
+        # Check Redis first
+        message_id = await get_shared_data(chat_id, "last_message_id")
+        if message_id:
+            logger.info("Used redis cashe to retrive last message id")
+            return message_id
+
+        # Fetch from MySQL if not in Redis
+        query = "SELECT MessageId FROM MessageIds WHERE ChatId = %s"
         result = await self.fetch_data(query, (chat_id,), fetch_one=True)
-        return result[0] if result else None
 
-    async def get_user_acount(self, chat_id: int) -> Optional[int]:
+        if result:
+            # Update Redis cache
+            await set_shared_data(
+                chat_id, "last_message_id", result[0], persistent=True
+            )
+            logger.info(
+                "Could not find the last message ID in Redis cache. Fetched and cached it."
+            )
+
+            return result[0]
+
+        return None
+
+    async def reset_last_message_id(self, chat_id: int) -> None:
         """
-        Given a chat id, this function fetches the user accoount from the database.
-        If there's no such entry, None is returned.
+        Resets the last message ID in both Redis and MySQL.
         """
-        query = """
-                SELECT UserID FROM Users
-                WHERE ChatId = %s;
-        """
-        result = await self.fetch_data(query, (chat_id,), fetch_one=True)
-        if result and isinstance(result[0], bytes):  # Check if the result is in bytes
-            return result[0].decode("utf-8")
-        return result[0] if result else None
+        # Lazy import to avoid circular dependency
+        from database.redis_tools import delete_shared_data
+
+        # Reset in Redis
+        await delete_shared_data(chat_id, "last_message_id")
+
+        # Reset in MySQL
+        query = "DELETE FROM MessageIds WHERE ChatId = %s"
+        await self.execute_query(query, (chat_id,))
+        logger.info("Successfully reseted the last message id.")
 
     async def initialize_database(self) -> None:
         """
