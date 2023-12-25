@@ -40,16 +40,15 @@ SUPPORT_USERNAME = config.SUPPORT_USER_NAME
 menu_structure = {
     "users_main_menu": {
         "text": "📁 به پنل کاربری خوش آمدید. یکی از موارد زیر را انتخاب کنید.",
-        "row_width": [1, 2, 3, 1],
+        "row_width": [1, 2, 1, 1, 1],
         "menu_type": "user",
         "options": [
             {"text": "🤑کسب درآمد", "callback_data": "earning"},
-            {"text": "💳 شارژ کیف پول", "callback_data": "user_wallet_recharge"},
-            {"text": "🛍 خرید سرویس", "callback_data": "view_plans"},
-            {"text": "☎️ پشتیبانی", "callback_data": "support"},
-            {"text": "📚 ‌آموزش‌ها", "callback_data": "how_to's"},
             {"text": "📂 سرویس های من", "callback_data": "my_services"},
-            {"text": "🤗 عضویت در کانال اطلاع رسانی", "url": f"{CHANNEL_LINK}"},
+            {"text": "🛍 خرید سرویس", "callback_data": "buy"},
+            {"text": "📚 ‌آموزش‌ها", "callback_data": "how_to's"},
+            {"text": "☎️ پشتیبانی", "callback_data": "support"},
+            {"text": "🤗 عضویت در کانال", "url": f"{CHANNEL_LINK}"},
         ],
     },
     "how_to's": {

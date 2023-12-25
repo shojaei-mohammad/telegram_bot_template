@@ -17,13 +17,16 @@ Dependencies:
 """
 
 import asyncio
+import traceback
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.exceptions import (
     MessageToEditNotFound,
     MessageNotModified,
     MessageCantBeEdited,
 )
 
+from keyboards.inline.return_buttons import add_return_buttons
 from loader import bot, db_utils
 from utils.logger import LoggerSingleton
 
@@ -178,3 +181,70 @@ def escape_markdown_v2(text: str) -> str:
     text = text.replace(mono_placeholder, "*")
 
     return text
+
+
+async def display_plans() -> InlineKeyboardMarkup:
+    """
+    Fetches and displays available subscription plans.
+
+    This function queries the database for available subscription plans and
+    displays them to the user as inline buttons. Additional control buttons
+    like 'Back' and 'Main Menu' are also included for navigation.
+
+    Returns:
+        InlineKeyboardMarkup: Inline keyboard markup with subscription plans and control buttons.
+    """
+    markup = InlineKeyboardMarkup()
+    try:
+        fetch_plans_query = (
+            "SELECT SubscriptionID, SubscriptionName FROM Subscriptions;"
+        )
+        subs = await db_utils.fetch_data(fetch_plans_query)
+
+        for sub_id, sub_name in subs:
+            button = InlineKeyboardButton(f"{sub_name}", callback_data=f"sub_{sub_id}")
+            markup.add(button)
+
+        add_return_buttons(markup=markup)
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error fetching subscription plans: {e}\n{error_traceback}")
+
+    return markup
+
+
+async def display_tariffs(sub_id: int) -> InlineKeyboardMarkup:
+    """
+    Fetches and displays available tariffs for a selected subscription plan.
+
+    Args:
+        sub_id (int): The ID of the selected subscription plan.
+
+    Returns:
+        InlineKeyboardMarkup: Inline keyboard markup with tariffs for the selected plan and control buttons.
+    """
+    markup = InlineKeyboardMarkup()
+    try:
+        fetch_tariffs_query = """
+        SELECT TariffID, TariffName
+        FROM Tariffs
+        INNER JOIN Countries ON Tariffs.CountryID = Countries.CountryID
+        INNER JOIN Subscriptions ON Countries.SubscriptionID = Subscriptions.SubscriptionID
+        WHERE Subscriptions.SubscriptionID = %s;
+        """
+        tariffs = await db_utils.fetch_data(fetch_tariffs_query, (sub_id,))
+
+        for tariff_id, tariff_name in tariffs:
+            button = InlineKeyboardButton(
+                f"{tariff_name}", callback_data=f"tariff_{tariff_id}"
+            )
+            markup.add(button)
+
+        add_return_buttons(markup=markup, back_callback="buy")
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        logger.error(
+            f"Error fetching tariffs for subscription ID {sub_id}: {e}\n{error_traceback}"
+        )
+
+    return markup

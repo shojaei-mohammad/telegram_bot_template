@@ -27,4 +27,40 @@ table_creation_query = [
         FOREIGN KEY (ChatId) REFERENCES BotUsers(ChatID) ON DELETE CASCADE
     );
     """,
+    """
+    CREATE TABLE Subscriptions (
+        SubscriptionID INT AUTO_INCREMENT PRIMARY KEY,
+        SubscriptionName VARCHAR(50) NOT NULL UNIQUE
+)AUTO_INCREMENT=1000;
+    """,
+    """
+    CREATE TABLE Countries (
+        CountryID INT AUTO_INCREMENT PRIMARY KEY,
+        SubscriptionID INT NOT NULL,
+        CountryName VARCHAR(20) NOT NULL,
+        FOREIGN KEY (SubscriptionID) REFERENCES Subscriptions(SubscriptionID)
+);
+    """
+    """
+    CREATE TABLE Tariffs (
+        TariffID INT AUTO_INCREMENT PRIMARY KEY,
+        CountryID INT NOT NULL,
+        TariffName VARCHAR(255) NOT NULL,
+        Price DECIMAL(10, 2),
+        Duration INT,
+        Features TEXT,
+        INDEX (CountryID),
+        FOREIGN KEY (CountryID) REFERENCES Countries(CountryID)
+    )AUTO_INCREMENT=5510;
+    """,
+    """
+    CREATE TABLE Servers (
+        ServerID INT AUTO_INCREMENT PRIMARY KEY,
+        TariffID INT NOT NULL,
+        ServerIP VARCHAR(20) NOT NULL,
+        Username VARCHAR(20),
+        Password VARCHAR(30),
+        FOREIGN KEY (TariffID) REFERENCES Tariffs(TariffID)
+);
+    """,
 ]

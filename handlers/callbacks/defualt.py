@@ -22,7 +22,7 @@ Note:
 This module assumes that all callback data received from inline buttons corresponds
 to predefined menus or actions. Unrecognized callback data will trigger a default response.
 """
-
+import traceback
 
 from aiogram.types import CallbackQuery, ParseMode
 
@@ -107,6 +107,40 @@ async def callback_inline(call: CallbackQuery):
             reply_markup=referral_menu_markup,
             parsmode=ParseMode.MARKDOWN_V2,
         )
+    elif callback_data == "buy":
+        try:
+            markup = await bot_tools.display_plans()
+            title = "توضیحات طرح ها در اینجا قرار میگیرد."
+            await bot_tools.edit_or_send_new(
+                chat_id=chat_id, new_text=title, reply_markup=markup
+            )
+            await bot.answer_callback_query(call.id)
+        except Exception as e:
+            error_text = "هنگام دریافت طرح ها خطایی رخ داده است. لطفا دوباره تلاش کنید و یا با پشتیبانی تماس بگیرید"
+            await bot.answer_callback_query(call.id, error_text, show_alert=True)
+            error_trackback = traceback.format_exc()
+            logger.error(f"Error displaying plans: {e}\n{error_trackback}")
+
+    elif callback_data.startswith("sub_"):
+        try:
+            await bot.answer_callback_query(call.id)
+            sub_id = int(callback_data.split("_")[1])
+            markup = await bot_tools.display_tariffs(sub_id)
+            title = "توضیحات طرح ها در اینجا قرار میگیرد."
+            await bot_tools.edit_or_send_new(
+                chat_id=chat_id, new_text=title, reply_markup=markup
+            )
+        except ValueError:
+            error_text = "هنگام دریافت تعرفه ها خطایی رخ داده است. لطفا دوباره تلاش کنید و یا با پشتیبانی تماس بگیرید"
+            await bot.answer_callback_query(call.id, error_text, show_alert=True)
+            error_trackback = traceback.format_exc()
+            logger.error(f"Invalid subscription ID format in callback data.\n{error_trackback}")
+            # Handle the invalid subscription ID format (e.g., send an error message to the user)
+        except Exception as e:
+            error_text = "هنگام دریافت تعرفه ها خطایی رخ داده است. لطفا دوباره تلاش کنید و یا با پشتیبانی تماس بگیرید"
+            await bot.answer_callback_query(call.id, error_text, show_alert=True)
+            error_trackback = traceback.format_exc()
+            logger.error(f"Error displaying tariffs for subscription ID {sub_id}: {e}\n{error_trackback}")
     else:
         # If the callback_data doesn't match any known menu, log it and inform the user
         print(callback_data)
