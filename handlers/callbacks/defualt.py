@@ -134,13 +134,17 @@ async def callback_inline(call: CallbackQuery):
             error_text = "هنگام دریافت تعرفه ها خطایی رخ داده است. لطفا دوباره تلاش کنید و یا با پشتیبانی تماس بگیرید"
             await bot.answer_callback_query(call.id, error_text, show_alert=True)
             error_trackback = traceback.format_exc()
-            logger.error(f"Invalid subscription ID format in callback data.\n{error_trackback}")
+            logger.error(
+                f"Invalid subscription ID format in callback data.\n{error_trackback}"
+            )
             # Handle the invalid subscription ID format (e.g., send an error message to the user)
         except Exception as e:
             error_text = "هنگام دریافت تعرفه ها خطایی رخ داده است. لطفا دوباره تلاش کنید و یا با پشتیبانی تماس بگیرید"
             await bot.answer_callback_query(call.id, error_text, show_alert=True)
             error_trackback = traceback.format_exc()
-            logger.error(f"Error displaying tariffs for subscription ID {sub_id}: {e}\n{error_trackback}")
+            logger.error(
+                f"Error displaying tariffs for subscription ID {sub_id}: {e}\n{error_trackback}"
+            )
     else:
         # If the callback_data doesn't match any known menu, log it and inform the user
         print(callback_data)
