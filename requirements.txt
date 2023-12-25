@@ -4,3 +4,4 @@ environs==9.5.0
 
 aiomysql~=0.2.0
 aioredis~=2.0.1
+jdatetime~=4.1.1
