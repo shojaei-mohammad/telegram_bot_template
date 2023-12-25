@@ -98,7 +98,6 @@ async def create_markup(menu_key: str) -> Tuple[Any, Optional[str]]:
 
     options = menu["options"]
     menu_text = menu["text"]
-    menu_type = menu.get("menu_type")
     # Use the row_width from menu structure, or default if not present
     row_width = menu.get("row_width", default_row_width)
     # Create markup for the menu options
@@ -128,20 +127,15 @@ async def create_markup(menu_key: str) -> Tuple[Any, Optional[str]]:
 
     # Add the Back button if the back key is specified in the menu
     if "back" in menu:
-        back_button = InlineKeyboardButton("بازگشت", callback_data=menu["back"])
+        back_button = InlineKeyboardButton("🔙 بازگشت", callback_data=menu["back"])
         markup.add(back_button)
 
     # Add the Back to Main Menu button for non-main menus
     # only when the back menu itself has a back button, i.e., we're at least two levels deep
     if "back" in menu and "back" in menu_structure[menu["back"]]:
-        if menu_type == "admin":
-            main_menu_button = InlineKeyboardButton(
-                "خانه", callback_data="admins_main_menu"
-            )
-        else:
-            main_menu_button = InlineKeyboardButton(
-                "🏠 منو اصلی", callback_data="users_main_menu"
-            )
+        main_menu_button = InlineKeyboardButton(
+            "🏠 منو اصلی", callback_data="users_main_menu"
+        )
 
         markup.add(main_menu_button)
 
