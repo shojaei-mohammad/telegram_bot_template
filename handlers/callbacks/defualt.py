@@ -24,10 +24,13 @@ to predefined menus or actions. Unrecognized callback data will trigger a defaul
 """
 
 
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, ParseMode
 
 from keyboards.inline.main_menu import menu_structure, create_markup
-from loader import bot, dp
+from keyboards.inline.my_referral import referral_menu_markup
+from loader import bot, dp, db_utils
+from utils import bot_tools
+from utils.converters import convert_english_digits_to_farsi, convert_to_shamsi
 from utils.logger import LoggerSingleton
 
 logger = LoggerSingleton.get_logger()
@@ -72,7 +75,38 @@ async def callback_inline(call: CallbackQuery):
                     text=menu_text,
                     reply_markup=markup,
                 )
-
+    elif callback_data == "earning":
+        await bot.answer_callback_query(call.id)
+        user_info_query = """
+        SELECT 
+            UserID, WalletBalance, ReferralCount, ReferralLink,JoinOn
+        FROM 
+            BotUsers
+        WHERE
+            ChatID = %s;
+        """
+        results = await db_utils.fetch_data(
+            query=user_info_query, params=(chat_id,), fetch_one=True
+        )
+        account, balance, referral_count, referral_link, join_on = results
+        formmated_account = convert_english_digits_to_farsi(str(account))
+        formatted_balance = convert_english_digits_to_farsi(str(balance))
+        formatted_referral_count = convert_english_digits_to_farsi(str(referral_count))
+        formatted_join_on = convert_to_shamsi(join_on.date())
+        message_text = (
+            f"👤 شناسه کاربری : {formmated_account}\n"
+            f"💰 موجودی کیف پول: {formatted_balance} تومان\n"
+            f"👥 تعداد معرفی‌ها: {formatted_referral_count} نفر\n"
+            f"🗓️ تاریخ عضویت: {formatted_join_on}\n"
+            f"🔗 لینک معرف شما:\n `{referral_link}`\n\n"
+        )
+        message_text += "متن توضیات شما اینجا قرار خواهد گرفت"
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text=message_text,
+            reply_markup=referral_menu_markup,
+            parsmode=ParseMode.MARKDOWN_V2,
+        )
     else:
         # If the callback_data doesn't match any known menu, log it and inform the user
         print(callback_data)

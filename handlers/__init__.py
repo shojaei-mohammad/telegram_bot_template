@@ -6,4 +6,4 @@ def initialize_handlers():
         cancel_state_handler,
         registration_handler,
     )
-    from .callbacks import defualt
+    from .callbacks import defualt, inline_query_handler
