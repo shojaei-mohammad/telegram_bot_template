@@ -24,7 +24,7 @@ to predefined menus or actions. Unrecognized callback data will trigger a defaul
 """
 import traceback
 
-from aiogram.types import CallbackQuery, ParseMode
+from aiogram.types import CallbackQuery, ParseMode, InlineKeyboardMarkup
 
 from keyboards.inline.main_menu import menu_structure, create_markup
 from keyboards.inline.my_referral import referral_menu_markup
@@ -120,7 +120,6 @@ async def callback_inline(call: CallbackQuery):
             await bot.answer_callback_query(call.id, error_text, show_alert=True)
             error_trackback = traceback.format_exc()
             logger.error(f"Error displaying plans: {e}\n{error_trackback}")
-
     elif callback_data.startswith("sub_"):
         try:
             await bot.answer_callback_query(call.id)
@@ -145,6 +144,46 @@ async def callback_inline(call: CallbackQuery):
             logger.error(
                 f"Error displaying tariffs for subscription ID {sub_id}: {e}\n{error_trackback}"
             )
+    elif callback_data.startswith("faqs"):
+        try:
+            await bot.answer_callback_query(call.id)
+            # Extract the device platform ('ios' or 'android') from the callback data
+            platform = callback_data.split("_")[1]
+            # Generate FAQ buttons based on the selected platform
+            markup = bot_tools.generate_faq_buttons(platform)
+            # Send or edit a message with the FAQ buttons
+            await bot_tools.edit_or_send_new(
+                chat_id=chat_id,
+                new_text="سوال مورد نظر خودت رو انتخاب کن.",
+                reply_markup=markup,
+            )
+        except Exception as e:
+            logger.error(f"Error in 'faqs' callback handling: {e}")
+            await bot.answer_callback_query(
+                call.id, text="خطایی رخ داده لطفا دوباره تلاش کنید.", show_alert=True
+            )
+    elif callback_data.startswith("faqAnswer"):
+        try:
+            _, platform, index = callback_data.split("_")
+            index = int(index)  # Convert the index from string to integer
+            # Load FAQs and retrieve the answer for the selected question
+            faqs = bot_tools.load_faqs()
+            answer = faqs[platform][index]["answer"]
+            # Create a markup for return button
+            markup = InlineKeyboardMarkup()
+            bot_tools.add_return_buttons(
+                markup=markup, back_callback=f"faqs_{platform}"
+            )
+            # Send or edit a message with the selected FAQ answer
+            await bot_tools.edit_or_send_new(
+                chat_id=chat_id, new_text=answer, reply_markup=markup
+            )
+        except Exception as e:
+            logger.error(f"Error in 'faqAnswer' callback handling: {e}")
+            await bot.answer_callback_query(
+                call.id, text="خطایی رخ داده لطفا دوباره تلاش کنید.", show_alert=True
+            )
+
     else:
         # If the callback_data doesn't match any known menu, log it and inform the user
         print(callback_data)

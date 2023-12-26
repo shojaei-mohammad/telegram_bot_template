@@ -47,17 +47,28 @@ menu_structure = {
             {"text": "📂 سرویس های من", "callback_data": "my_services"},
             {"text": "🛍 خرید سرویس", "callback_data": "buy"},
             {"text": "📚 ‌آموزش‌ها", "callback_data": "how_to's"},
-            {"text": "☎️ پشتیبانی", "callback_data": "support"},
+            {"text": "💬 پشتیبانی", "callback_data": "faqs"},
             {"text": "🤗 عضویت در کانال", "url": f"{CHANNEL_LINK}"},
         ],
     },
     "how_to's": {
-        "text": "یکی از موارد زیر را انتخاب کنید:",
+        "text": "سیستم عامل متناسب با دستگاه خودتان را انتخاب نمایید.",
         "back": "users_main_menu",
         "menu_type": "user",
         "options": [
-            {"text": "📱 نرم افزارها", "callback_data": "softwares_menu"},
-            {"text": "📚 راهنما", "callback_data": "guids"},
+            {"text": "📱 اندروید", "callback_data": "iosGuid"},
+            {"text": "🍎 آیفون", "callback_data": "androidGuid"},
+        ],
+    },
+    "faqs": {
+        "text": "اول سوالات پرتکرار و بخون و اگه جوابتو پیدا نکردی خوشحال میشیم از طریق پشتیبانی با ما در ارتباط "
+        "باشی. همکاران ما در اسرع وقت پاسخگوی شما هستند.",
+        "back": "users_main_menu",
+        "menu_type": "user",
+        "options": [
+            {"text": "📱(FAQ) اندروید", "callback_data": "faqs_android"},
+            {"text": "🍎 (FAQ) آیفون", "callback_data": "faqs_ios"},
+            {"text": "☎️ ارتباط با ما", "url": f"{SUPPORT_USERNAME}"},
         ],
     },
 }

@@ -17,6 +17,8 @@ Dependencies:
 """
 
 import asyncio
+import json
+import os
 import traceback
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -248,3 +250,63 @@ async def display_tariffs(sub_id: int) -> InlineKeyboardMarkup:
         )
 
     return markup
+
+
+def load_faqs():
+    """
+    Loads FAQ data from a JSON file.
+
+    This function reads FAQs from a JSON file located in the 'data' directory
+    relative to the script's parent directory. It returns a dictionary
+    of FAQs categorized by platform.
+
+    Returns:
+        dict: A dictionary containing FAQs categorized by platform.
+
+    Raises:
+        FileNotFoundError: If the FAQs JSON file is not found.
+        JSONDecodeError: If there's an error parsing the JSON file.
+    """
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(current_dir)  # One level up from current directory
+        json_file = os.path.join(parent_dir, "data/faqs.json")
+
+        with open(json_file, "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        logger.error("FAQs JSON file not found.")
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing FAQs JSON file: {e}")
+        raise
+
+
+def generate_faq_buttons(platform: str) -> InlineKeyboardMarkup:
+    """
+    Generates inline keyboard buttons for FAQs based on the specified platform.
+
+    Args:
+        platform (str): The platform for which FAQs are to be displayed ('IOS' or 'android').
+
+    Returns:
+        InlineKeyboardMarkup: An inline keyboard markup containing buttons for each FAQ.
+
+    Raises:
+        KeyError: If the platform is not found in the FAQs data.
+    """
+    try:
+        markup = InlineKeyboardMarkup()
+        faqs = load_faqs()  # Load FAQs from the JSON file
+
+        for index, faq in enumerate(faqs[platform]):
+            button = InlineKeyboardButton(
+                text=faq["question"], callback_data=f"faqAnswer_{platform}_{index}"
+            )
+            markup.add(button)
+
+        add_return_buttons(markup=markup, back_callback="faqs")
+        return markup
+    except KeyError as e:
+        logger.error(f"Platform '{platform}' not found in FAQs data: {e}")
+        raise
