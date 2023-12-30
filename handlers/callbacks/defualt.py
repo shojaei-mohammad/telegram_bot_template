@@ -23,9 +23,16 @@ This module assumes that all callback data received from inline buttons correspo
 to predefined menus or actions. Unrecognized callback data will trigger a default response.
 """
 import traceback
+from decimal import Decimal
 
-from aiogram.types import CallbackQuery, ParseMode, InlineKeyboardMarkup
+from aiogram.types import (
+    CallbackQuery,
+    ParseMode,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 
+from data.config import NUMBER_OF_ALLOWED_USERS
 from keyboards.inline.main_menu import menu_structure, create_markup
 from keyboards.inline.my_referral import referral_menu_markup
 from loader import bot, dp, db_utils
@@ -107,9 +114,10 @@ async def callback_inline(call: CallbackQuery):
             reply_markup=referral_menu_markup,
             parsmode=ParseMode.MARKDOWN_V2,
         )
-    elif callback_data == "buy":
+    elif callback_data.startswith("buy_"):
         try:
-            markup = await bot_tools.display_plans()
+            subscription_type = callback_data.split("_")[1]
+            markup = await bot_tools.display_plans(subscription_type=subscription_type)
             title = "توضیحات طرح ها در اینجا قرار میگیرد."
             await bot_tools.edit_or_send_new(
                 chat_id=chat_id, new_text=title, reply_markup=markup
@@ -121,14 +129,20 @@ async def callback_inline(call: CallbackQuery):
             error_trackback = traceback.format_exc()
             logger.error(f"Error displaying plans: {e}\n{error_trackback}")
     elif callback_data.startswith("sub_"):
+        sub_id = None
         try:
-            await bot.answer_callback_query(call.id)
             sub_id = int(callback_data.split("_")[1])
             markup = await bot_tools.display_tariffs(sub_id)
-            title = "توضیحات طرح ها در اینجا قرار میگیرد."
-            await bot_tools.edit_or_send_new(
-                chat_id=chat_id, new_text=title, reply_markup=markup
-            )
+            if markup:
+                await bot.answer_callback_query(call.id)
+                title = "توضیحات طرح ها در اینجا قرار میگیرد."
+                await bot_tools.edit_or_send_new(
+                    chat_id=chat_id, new_text=title, reply_markup=markup
+                )
+            else:
+                await bot.answer_callback_query(
+                    call.id, "تعرفه ای یافت نشد!", show_alert=True
+                )
         except ValueError:
             error_text = "هنگام دریافت تعرفه ها خطایی رخ داده است. لطفا دوباره تلاش کنید و یا با پشتیبانی تماس بگیرید"
             await bot.answer_callback_query(call.id, error_text, show_alert=True)
@@ -144,6 +158,16 @@ async def callback_inline(call: CallbackQuery):
             logger.error(
                 f"Error displaying tariffs for subscription ID {sub_id}: {e}\n{error_trackback}"
             )
+    elif callback_data.startswith("tariff_"):
+        await bot.answer_callback_query(call.id)
+        tariff_id = int(callback_data.split("_")[1])
+        invoice, markup = await bot_tools.create_invoice(tariff_id)
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text=invoice,
+            reply_markup=markup,
+            parsmode=ParseMode.HTML,
+        )
     elif callback_data.startswith("faqs"):
         try:
             await bot.answer_callback_query(call.id)
@@ -170,7 +194,20 @@ async def callback_inline(call: CallbackQuery):
             faqs = bot_tools.load_faqs()
             answer = faqs[platform][index]["answer"]
             # Create a markup for return button
-            markup = InlineKeyboardMarkup()
+            markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="✅ حل شد", callback_data="users_main_menu"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="ارسال تیکت پشتیبانی", callback_data="ticket"
+                        )
+                    ],
+                ]
+            )
             bot_tools.add_return_buttons(
                 markup=markup, back_callback=f"faqs_{platform}"
             )
@@ -183,7 +220,95 @@ async def callback_inline(call: CallbackQuery):
             await bot.answer_callback_query(
                 call.id, text="خطایی رخ داده لطفا دوباره تلاش کنید.", show_alert=True
             )
+    elif callback_data.startswith("addUser") or callback_data.startswith("deductUser"):
+        (
+            action,
+            tariff_id,
+            current_additional_users,
+            current_price,
+            default_user,
+            additional_volume,
+        ) = callback_data.split("_")
+        tariff_id = int(tariff_id)
+        current_additional_users = int(current_additional_users)
+        default_user = int(default_user)
 
+        if action == "addUser":
+            if current_additional_users + default_user < NUMBER_OF_ALLOWED_USERS:
+                current_additional_users += 1
+            else:
+                # Notify user that they have reached the maximum limit
+                await bot.answer_callback_query(
+                    call.id,
+                    f"حداکثر تعداد مجاز {NUMBER_OF_ALLOWED_USERS} کاربر می‌باشد.",
+                    show_alert=True,
+                )
+                return  # Stop further processing
+
+        elif action == "deductUser":
+            if current_additional_users > 0:
+                current_additional_users = max(0, current_additional_users - 1)
+            else:
+                # Notify user that they cannot reduce users below zero
+                await bot.answer_callback_query(call.id)
+                return  # Stop further processing
+
+        # Call create_invoice with the updated current_additional_users
+        invoice_text, markup = await bot_tools.create_invoice(
+            tariff_id=tariff_id,
+            current_additional_users=current_additional_users,
+            current_price=Decimal(current_price),
+            additional_volume=int(additional_volume),
+        )
+
+        # Update the message with the new invoice
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text=invoice_text,
+            reply_markup=markup,
+            parsmode=ParseMode.HTML,
+        )
+
+    elif callback_data.startswith("addVolume_") or callback_data.startswith(
+        "deductVolume_"
+    ):
+        (
+            action,
+            tariff_id,
+            additional_volume,
+            current_price,
+            current_additional_users,
+        ) = callback_data.split("_")
+        tariff_id = int(tariff_id)
+        additional_volume = int(additional_volume)
+
+        if action == "addVolume":
+            additional_volume += 1
+        elif action == "deductVolume":
+            if additional_volume > 0:
+                additional_volume = max(0, additional_volume - 1)
+            else:
+                # Notify user that they cannot reduce users below zero
+                await bot.answer_callback_query(call.id)
+                return  # Stop further processing
+
+        # Call create_invoice with the new adjustment
+        invoice_text, markup = await bot_tools.create_invoice(
+            tariff_id,
+            current_additional_users=int(current_additional_users),
+            current_price=Decimal(current_price),
+            additional_volume=additional_volume,
+        )
+        # Update the message with the new invoice
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text=invoice_text,
+            reply_markup=markup,
+            parsmode=ParseMode.HTML,
+        )
+
+    elif callback_data == "NoAction":
+        await bot.answer_callback_query(call.id)
     else:
         # If the callback_data doesn't match any known menu, log it and inform the user
         print(callback_data)

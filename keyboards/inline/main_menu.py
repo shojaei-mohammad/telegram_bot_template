@@ -51,6 +51,15 @@ menu_structure = {
             {"text": "🤗 عضویت در کانال", "url": f"{CHANNEL_LINK}"},
         ],
     },
+    "buy": {
+        "text": "📁 به پنل کاربری خوش آمدید. یکی از موارد زیر را انتخاب کنید.",
+        "back": "users_main_menu",
+        "menu_type": "user",
+        "options": [
+            {"text": "⏳ حجمی", "callback_data": "buy_limited"},
+            {"text": "♾️ نامحدود", "callback_data": "buy_unlimited"},
+        ],
+    },
     "how_to's": {
         "text": "سیستم عامل متناسب با دستگاه خودتان را انتخاب نمایید.",
         "back": "users_main_menu",
@@ -68,7 +77,6 @@ menu_structure = {
         "options": [
             {"text": "📱(FAQ) اندروید", "callback_data": "faqs_android"},
             {"text": "🍎 (FAQ) آیفون", "callback_data": "faqs_ios"},
-            {"text": "☎️ ارتباط با ما", "url": f"{SUPPORT_USERNAME}"},
         ],
     },
 }
@@ -126,7 +134,7 @@ async def create_markup(menu_key: str) -> Tuple[Any, Optional[str]]:
     button_rows = []
     for width in row_width:
         row = []
-        for _ in range(width):
+        for _ in range(int(width)):
             if buttons:  # Check if there are still buttons left
                 row.append(buttons.pop(0))
         button_rows.append(row)

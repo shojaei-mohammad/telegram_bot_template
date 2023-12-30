@@ -58,3 +58,7 @@ SUPPORT_USER_NAME = env.str("SUPPORT_USER_NAME")  # Username of the support acco
 
 #
 PAYMENT_DEADLINE = env.int("PAYMENT_DEADLINE")  # Payment deadline in minutes.
+
+CARD_HOLDER = env.str("CARD_HOLDER")
+CARD_NUMBER = env.str("CARD_NUMBER")
+NUMBER_OF_ALLOWED_USERS = env.int("NUMBER_OF_ALLOWED_USERS")

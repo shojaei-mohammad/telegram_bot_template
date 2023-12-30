@@ -20,6 +20,8 @@ import asyncio
 import json
 import os
 import traceback
+from datetime import datetime
+from decimal import Decimal
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.exceptions import (
@@ -28,8 +30,10 @@ from aiogram.utils.exceptions import (
     MessageCantBeEdited,
 )
 
+from data.config import CARD_HOLDER, CARD_NUMBER
 from keyboards.inline.return_buttons import add_return_buttons
 from loader import bot, db_utils
+from utils.converters import convert_to_shamsi
 from utils.logger import LoggerSingleton
 
 logger = LoggerSingleton.get_logger()
@@ -185,7 +189,7 @@ def escape_markdown_v2(text: str) -> str:
     return text
 
 
-async def display_plans() -> InlineKeyboardMarkup:
+async def display_plans(subscription_type: str) -> InlineKeyboardMarkup:
     """
     Fetches and displays available subscription plans.
 
@@ -198,16 +202,14 @@ async def display_plans() -> InlineKeyboardMarkup:
     """
     markup = InlineKeyboardMarkup()
     try:
-        fetch_plans_query = (
-            "SELECT SubscriptionID, SubscriptionName FROM Subscriptions;"
-        )
-        subs = await db_utils.fetch_data(fetch_plans_query)
+        fetch_plans_query = "SELECT SubscriptionID, SubscriptionName FROM Subscriptions WHERE SubscriptionType = %s;"
+        subs = await db_utils.fetch_data(fetch_plans_query, (subscription_type,))
 
         for sub_id, sub_name in subs:
             button = InlineKeyboardButton(f"{sub_name}", callback_data=f"sub_{sub_id}")
             markup.add(button)
 
-        add_return_buttons(markup=markup)
+        add_return_buttons(markup=markup, back_callback=f"buy_{subscription_type}")
     except Exception as e:
         error_traceback = traceback.format_exc()
         logger.error(f"Error fetching subscription plans: {e}\n{error_traceback}")
@@ -215,7 +217,7 @@ async def display_plans() -> InlineKeyboardMarkup:
     return markup
 
 
-async def display_tariffs(sub_id: int) -> InlineKeyboardMarkup:
+async def display_tariffs(sub_id: int) -> InlineKeyboardMarkup | None:
     """
     Fetches and displays available tariffs for a selected subscription plan.
 
@@ -223,31 +225,43 @@ async def display_tariffs(sub_id: int) -> InlineKeyboardMarkup:
         sub_id (int): The ID of the selected subscription plan.
 
     Returns:
-        InlineKeyboardMarkup: Inline keyboard markup with tariffs for the selected plan and control buttons.
+        InlineKeyboardMarkup: An inline keyboard markup containing buttons for each tariff,
+                              or None if no tariffs are found.
+
+    Raises:
+        Exception: If an error occurs during database fetch operation.
     """
     markup = InlineKeyboardMarkup()
     try:
         fetch_tariffs_query = """
         SELECT TariffID, TariffName
         FROM Tariffs
-        INNER JOIN Countries ON Tariffs.CountryID = Countries.CountryID
-        INNER JOIN Subscriptions ON Countries.SubscriptionID = Subscriptions.SubscriptionID
+        INNER JOIN Subscriptions ON Tariffs.SubscriptionID = Subscriptions.SubscriptionID
         WHERE Subscriptions.SubscriptionID = %s;
         """
         tariffs = await db_utils.fetch_data(fetch_tariffs_query, (sub_id,))
 
+        # Check if tariffs are available
+        if not tariffs:
+            logger.info(f"No tariffs found for subscription ID {sub_id}")
+            return None  # Return None if no tariffs are found
+
+        # Loop through tariffs and add buttons to markup
         for tariff_id, tariff_name in tariffs:
             button = InlineKeyboardButton(
                 f"{tariff_name}", callback_data=f"tariff_{tariff_id}"
             )
             markup.add(button)
 
+        # Add return button to markup
         add_return_buttons(markup=markup, back_callback="buy")
+
     except Exception as e:
         error_traceback = traceback.format_exc()
         logger.error(
             f"Error fetching tariffs for subscription ID {sub_id}: {e}\n{error_traceback}"
         )
+        raise  # Re-raise the exception to handle it in the calling context
 
     return markup
 
@@ -310,3 +324,116 @@ def generate_faq_buttons(platform: str) -> InlineKeyboardMarkup:
     except KeyError as e:
         logger.error(f"Platform '{platform}' not found in FAQs data: {e}")
         raise
+
+
+async def create_invoice(
+    tariff_id: int,
+    current_additional_users: int = 0,
+    current_price: Decimal = None,
+    additional_volume: int = 0,
+):
+    get_tariff_info_query = """
+    SELECT
+        Tariffs.SubscriptionID, Tariffs.TariffName, Tariffs.Price, Subscriptions.SubscriptionDescription,
+        Subscriptions.SubscriptionType, Subscriptions.AddedPricePerUser,
+        Subscriptions.PricePerGig, Subscriptions.NumberOfUsers
+    FROM
+        Tariffs 
+    INNER JOIN
+        Subscriptions ON Tariffs.SubscriptionID = Subscriptions.SubscriptionID
+    WHERE TariffID = %s
+    """
+    result = await db_utils.fetch_data(
+        query=get_tariff_info_query, params=(tariff_id,), fetch_one=True
+    )
+    if result:
+        (
+            sub_id,
+            name,
+            price,
+            description,
+            subscription_type,
+            price_per_user,
+            price_per_gig,
+            users,
+        ) = result
+        # If current_price is None, use the base price from the database
+        if current_price is None:
+            current_price = price
+
+        # Calculate the additional cost
+        additional_cost_for_users = 0
+        if current_additional_users > 0:
+            price_increase_per_user = Decimal(price_per_user) / Decimal(100)
+            additional_cost_for_users = (
+                price * price_increase_per_user * Decimal(current_additional_users)
+            )
+
+        additional_cost_per_gig = 0
+        if additional_volume > 0:
+            additional_cost_per_gig = Decimal(price_per_gig) * Decimal(
+                additional_volume
+            )
+
+        # Calculate the new price
+        new_price = price + additional_cost_for_users + additional_cost_per_gig
+
+        # formatting invoice
+        invoice_date = convert_to_shamsi(datetime.now())
+
+        # Calculate the total number of users for display
+        total_users = users + current_additional_users
+        formatted_new_price = "{:,}".format(int(new_price))
+        invoice_text = f"""
+        🧾 صورت‌حساب 🧾
+
+        مشتری گرامی،
+        از انتخاب شما متشکریم! جزئیات خرید طرح شما به شرح زیر است:
+
+        🔹 نام طرح:\n    {name}
+        🔹 تعداد کاربر: {total_users}
+        🔹 حجم اضافه: {additional_volume} GB
+        🔹 قیمت: {formatted_new_price} تومان
+        📅 تاریخ صورت‌حساب: {invoice_date}
+        💳 جزئیات پرداخت:
+        شماره کارت: <code>{CARD_NUMBER}</code>
+        نام دارنده کارت: {CARD_HOLDER}
+        <code>{int(new_price)}</code>
+        """
+
+        markup = InlineKeyboardMarkup()
+        add_user_txt_btn = InlineKeyboardButton(
+            text="افزدون کاربر", callback_data="NoAction"
+        )
+
+        # Update the callback data for the buttons
+        add_user_btn = InlineKeyboardButton(
+            text="➕",
+            callback_data=f"addUser_{tariff_id}_{current_additional_users}_{new_price}_{users}_{additional_volume}",
+        )
+        deduct_user_btn = InlineKeyboardButton(
+            text="➖",
+            callback_data=f"deductUser_{tariff_id}_{current_additional_users}_{new_price}_{users}_{additional_volume}",
+        )
+        markup.add(add_user_btn, add_user_txt_btn, deduct_user_btn)
+
+        if subscription_type == "limited":
+            add_volume_txt_btn = InlineKeyboardButton(
+                text="افزدون حجم", callback_data="NoAction"
+            )
+            add_volume_btn = InlineKeyboardButton(
+                text="➕",
+                callback_data=f"addVolume_{tariff_id}_{additional_volume}_{new_price}_{current_additional_users}",
+            )
+            deduct_volume_btn = InlineKeyboardButton(
+                text="➖",
+                callback_data=f"deductVolume_{tariff_id}_{additional_volume}_{new_price}_{current_additional_users}",
+            )
+            markup.add(add_volume_btn, add_volume_txt_btn, deduct_volume_btn)
+        confirm_btn = InlineKeyboardButton(
+            text="پرداخت کردم",
+            callback_data=f"paid_{tariff_id}_{total_users}_{additional_volume}",
+        )
+        markup.add(confirm_btn)
+        add_return_buttons(markup=markup, back_callback=f"sub_{sub_id}")
+        return invoice_text, markup
