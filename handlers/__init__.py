@@ -2,8 +2,5 @@
 
 
 def initialize_handlers():
-    from . import (
-        cancel_state_handler,
-        registration_handler,
-    )
+    from . import registration_handler, default_handlers
     from .callbacks import defualt, inline_query_handler

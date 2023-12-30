@@ -78,16 +78,18 @@ table_creation_query = [
 );
     """,
     """
-    CREATE TABLE PurchaseHistory (
-        PurchaseID INT AUTO_INCREMENT PRIMARY KEY,
-        UserID INT NOT NULL,
-        TariffID INT NOT NULL,
-        PurchaseDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        Amount DECIMAL(10, 2) NOT NULL,
-        FOREIGN KEY (UserID) REFERENCES BotUsers(UserID),
-        FOREIGN KEY (TariffID) REFERENCES Tariffs(TariffID),
-        INDEX (UserID),
-        INDEX (TariffID)
-);
+CREATE TABLE `PurchaseHistory` (
+  `PurchaseID` int NOT NULL AUTO_INCREMENT,
+  `ChatID` bigint NOT NULL,
+  `TariffID` int NOT NULL,
+  `PurchaseDate` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `Amount` decimal(10,2) NOT NULL,
+  `Status` enum('pending','cancel','rejected','completed') DEFAULT 'pending',
+  PRIMARY KEY (`PurchaseID`),
+  KEY `ChatID` (`ChatID`),
+  KEY `TariffID` (`TariffID`),
+  CONSTRAINT `PurchaseHistory_ibfk_1` FOREIGN KEY (`ChatID`) REFERENCES `BotUsers` (`ChatID`),
+  CONSTRAINT `PurchaseHistory_ibfk_2` FOREIGN KEY (`TariffID`) REFERENCES `Tariffs` (`TariffID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
     """,
 ]

@@ -33,9 +33,11 @@ from aiogram.types import (
 )
 
 from data.config import NUMBER_OF_ALLOWED_USERS
+from database.redis_tools import set_shared_data
 from keyboards.inline.main_menu import menu_structure, create_markup
 from keyboards.inline.my_referral import referral_menu_markup
 from loader import bot, dp, db_utils
+from states.wait_for_payment_receipt import InputPhotoState
 from utils import bot_tools
 from utils.converters import convert_english_digits_to_farsi, convert_to_shamsi
 from utils.logger import LoggerSingleton
@@ -268,7 +270,6 @@ async def callback_inline(call: CallbackQuery):
             reply_markup=markup,
             parsmode=ParseMode.HTML,
         )
-
     elif callback_data.startswith("addVolume_") or callback_data.startswith(
         "deductVolume_"
     ):
@@ -306,7 +307,40 @@ async def callback_inline(call: CallbackQuery):
             reply_markup=markup,
             parsmode=ParseMode.HTML,
         )
+    elif callback_data.startswith("paid_"):
+        _, tariff_id, total_users, additional_volume, amount = callback_data.split("_")
+        purchase_data = {
+            "chat_id": chat_id,
+            "tariff_ad": int(tariff_id),
+            "users": int(total_users),
+            "volume": int(additional_volume),
+            "amount": int(amount),
+        }
+        await set_shared_data(chat_id=chat_id, key="purchase_data", value=purchase_data)
+        save_purchase_query = "INSERT INTO PurchaseHistory (ChatID, TariffID, Amount) VALUES (%s, %s, %s);"
 
+        purchase_id = await db_utils.execute_query(
+            query=save_purchase_query,
+            params=(chat_id, tariff_id, Decimal(amount)),
+            fetch_last_insert_id=True,
+        )
+        prompt_text = (
+            "لطفا عکس رسید خودتان را ارسال نمایید.\n"
+            "در صورتی که منصرف شدید با فشردن دکمه لغو سفارش به منو اصلی بازگردید."
+        )
+        markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="لغو سفارش", callback_data=f"cancelPurchase_{purchase_id}"
+                    )
+                ]
+            ]
+        )
+        await InputPhotoState.wait_for_photo.set()
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id, new_text=prompt_text, reply_markup=markup
+        )
     elif callback_data == "NoAction":
         await bot.answer_callback_query(call.id)
     else:
