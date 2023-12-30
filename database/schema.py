@@ -63,4 +63,31 @@ table_creation_query = [
         FOREIGN KEY (TariffID) REFERENCES Tariffs(TariffID)
 );
     """,
+    """
+    CREATE TABLE UserSubscriptions (
+        SubscriptionID INT AUTO_INCREMENT PRIMARY KEY,
+        UserID INT NOT NULL,
+        TariffID INT NOT NULL,
+        StartDate DATE NOT NULL,
+        EndDate DATE NOT NULL,
+        IsActive BOOLEAN NOT NULL,
+        FOREIGN KEY (UserID) REFERENCES BotUsers(UserID),
+        FOREIGN KEY (TariffID) REFERENCES Tariffs(TariffID),
+        INDEX (UserID),
+        INDEX (TariffID)
+);
+    """,
+    """
+    CREATE TABLE PurchaseHistory (
+        PurchaseID INT AUTO_INCREMENT PRIMARY KEY,
+        UserID INT NOT NULL,
+        TariffID INT NOT NULL,
+        PurchaseDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        Amount DECIMAL(10, 2) NOT NULL,
+        FOREIGN KEY (UserID) REFERENCES BotUsers(UserID),
+        FOREIGN KEY (TariffID) REFERENCES Tariffs(TariffID),
+        INDEX (UserID),
+        INDEX (TariffID)
+);
+    """,
 ]
