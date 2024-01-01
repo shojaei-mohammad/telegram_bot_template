@@ -147,10 +147,9 @@ async def handle_receipt_photo(message: types.Message, state: FSMContext):
 
         # Reset the FSM state to its default value after photo processing
         await state.finish()
-        print(f"this is amount:{amount}")
         # Prepare the message text to be sent to the admin(s)
         amount_md = escape_markdown_v2(str(amount))
-        print(f"this is formatted amount:{amount_md}")
+
         # Define the SQL query to get the wallet balance
         sql_query = "SELECT UserID FROM BotUsers WHERE ChatID = %s"
 
@@ -167,10 +166,10 @@ async def handle_receipt_photo(message: types.Message, state: FSMContext):
         # Prepare the inline keyboard with confirmation and rejection buttons for the admin(s)
         admin_markup = InlineKeyboardMarkup(row_width=2)
         confirm_button = InlineKeyboardButton(
-            "✅ تأیید", callback_data=f"admin_confirm_payment_{chat_id}"
+            "✅ تأیید", callback_data=f"confirm_payment_{chat_id}"
         )
         reject_button = InlineKeyboardButton(
-            "❌ رد", callback_data=f"admin_reject_payment_{chat_id}"
+            "❌ رد", callback_data=f"reject_payment_{chat_id}"
         )
         admin_markup.add(confirm_button, reject_button)
 

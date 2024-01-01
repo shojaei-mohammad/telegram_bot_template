@@ -211,7 +211,7 @@ async def display_plans(subscription_type: str) -> InlineKeyboardMarkup:
             )
             markup.add(button)
 
-        add_return_buttons(markup=markup, back_callback=f"buy")
+        add_return_buttons(markup=markup, back_callback="buy")
     except Exception as e:
         error_traceback = traceback.format_exc()
         logger.error(f"Error fetching subscription plans: {e}\n{error_traceback}")
@@ -389,12 +389,13 @@ async def create_invoice(
 ):
     get_tariff_info_query = """
     SELECT
-        Tariffs.SubscriptionID, Tariffs.TariffName, Tariffs.Price, Subscriptions.SubscriptionDescription,
+        Tariffs.SubscriptionID, Tariffs.TariffName, Tariffs.Price, Tariffs.Duration,
+        Tariffs.Volume,Subscriptions.SubscriptionDescription,
         Subscriptions.SubscriptionType, Subscriptions.AddedPricePerUser, Subscriptions.PricePerGig,
         Subscriptions.VolumeExtendable, Subscriptions.UserExtendable, Subscriptions.NumberOfUsers,
         Subscriptions.Platform , Countries.CountryID, Countries.CountryName
     FROM
-        Tariffs 
+        Tariffs
     INNER JOIN
         Subscriptions ON Tariffs.SubscriptionID = Subscriptions.SubscriptionID
     INNER JOIN
@@ -409,6 +410,8 @@ async def create_invoice(
             sub_id,
             name,
             price,
+            duration,
+            volume,
             description,
             subscription_type,
             price_per_user,
@@ -494,9 +497,13 @@ async def create_invoice(
                 callback_data=f"deductVolume_{tariff_id}_{additional_volume}_{new_price}_{current_additional_users}",
             )
             markup.add(add_volume_btn, add_volume_txt_btn, deduct_volume_btn)
+        if volume is not None:
+            total_volume = additional_volume + volume
+        else:
+            total_volume = 0
         confirm_btn = InlineKeyboardButton(
             text="پرداخت کردم",
-            callback_data=f"paid_{tariff_id}_{total_users}_{additional_volume}_{int(new_price)}_{platform}",
+            callback_data=f"paid_{tariff_id}_{total_users}_{total_volume}_{int(new_price)}_{platform}_{duration}",
         )
         markup.add(confirm_btn)
         add_return_buttons(

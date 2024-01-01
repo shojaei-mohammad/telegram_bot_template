@@ -63,3 +63,34 @@ def convert_to_shamsi(greg_date: datetime) -> str:
         return "Invalid Date"
 
     return convert_english_digits_to_farsi(shamsi_date_str)
+
+
+def convert_days_to_epoch(expire_days):
+    """
+    Converts a number of days from the current date-time to its corresponding Unix timestamp (Epoch time).
+
+    Parameters:
+    - expire_days (int): The number of days from the current date-time.
+
+    Returns:
+    - int: The Unix timestamp (Epoch time) representation of the future date-time.
+
+    Example:
+    >>> convert_days_to_epoch(5)
+    # Returns the Unix timestamp for 5 days from now.
+    """
+
+    # Get the current date-time
+    current_dt = datetime.datetime.utcnow()
+
+    # Add the days to get the future date-time
+    future_dt = current_dt + datetime.timedelta(days=expire_days)
+
+    # Convert to epoch time in milliseconds
+    epoch = int(future_dt.timestamp() * 1000)
+    return epoch
+
+
+def gb_to_bytes(gb):
+    # 1 GB is 1024^3 bytes
+    return int(gb * (1024**3))

@@ -33,13 +33,14 @@ from aiogram.types import (
 )
 
 from data.config import NUMBER_OF_ALLOWED_USERS
-from database.redis_tools import set_shared_data
+from database.redis_tools import set_shared_data, get_shared_data, delete_shared_data
 from keyboards.inline.main_menu import menu_structure, create_markup
 from keyboards.inline.my_referral import referral_menu_markup
 from loader import bot, dp, db_utils
 from states.wait_for_payment_receipt import InputPhotoState
+from user_handler.factory import CreateUserFactory
 from utils import bot_tools
-from utils.converters import convert_english_digits_to_farsi, convert_to_shamsi
+from utils import converters as convert
 from utils.logger import LoggerSingleton
 
 logger = LoggerSingleton.get_logger()
@@ -87,9 +88,9 @@ async def callback_inline(call: CallbackQuery):
     elif callback_data == "earning":
         await bot.answer_callback_query(call.id)
         user_info_query = """
-        SELECT 
+        SELECT
             UserID, WalletBalance, ReferralCount, ReferralLink,JoinOn
-        FROM 
+        FROM
             BotUsers
         WHERE
             ChatID = %s;
@@ -98,10 +99,12 @@ async def callback_inline(call: CallbackQuery):
             query=user_info_query, params=(chat_id,), fetch_one=True
         )
         account, balance, referral_count, referral_link, join_on = results
-        formmated_account = convert_english_digits_to_farsi(str(account))
-        formatted_balance = convert_english_digits_to_farsi(str(balance))
-        formatted_referral_count = convert_english_digits_to_farsi(str(referral_count))
-        formatted_join_on = convert_to_shamsi(join_on.date())
+        formmated_account = convert.convert_english_digits_to_farsi(str(account))
+        formatted_balance = convert.convert_english_digits_to_farsi(str(balance))
+        formatted_referral_count = convert.convert_english_digits_to_farsi(
+            str(referral_count)
+        )
+        formatted_join_on = convert.convert_to_shamsi(join_on.date())
         message_text = (
             f"👤 شناسه کاربری : {formmated_account}\n"
             f"💰 موجودی کیف پول: {formatted_balance} تومان\n"
@@ -117,6 +120,9 @@ async def callback_inline(call: CallbackQuery):
             parsmode=ParseMode.MARKDOWN_V2,
         )
     elif callback_data.startswith("buy_"):
+        """
+        Displays the subscriptions based on user selectin `limited` or `unlimited`
+        """
         try:
             subscription_type = callback_data.split("_")[1]
             markup = await bot_tools.display_plans(subscription_type=subscription_type)
@@ -131,10 +137,14 @@ async def callback_inline(call: CallbackQuery):
             error_trackback = traceback.format_exc()
             logger.error(f"Error displaying plans: {e}\n{error_trackback}")
     elif callback_data.startswith("sub_"):
+        """
+        Displays all subscription related to limited or unlimited based on user selection
+        """
         sub_id = None
         try:
             sub_id = int(callback_data.split("_")[1])
-            markup = await bot_tools.display_tariffs(sub_id)
+            subscription_type = callback_data.split("_")[2]
+            markup = await bot_tools.display_tariffs(sub_id, subscription_type)
             if markup:
                 await bot.answer_callback_query(call.id)
                 title = "توضیحات طرح ها در اینجا قرار میگیرد."
@@ -161,8 +171,23 @@ async def callback_inline(call: CallbackQuery):
                 f"Error displaying tariffs for subscription ID {sub_id}: {e}\n{error_trackback}"
             )
     elif callback_data.startswith("tariff_"):
+        """
+        Display the available counries
+        """
         await bot.answer_callback_query(call.id)
-        tariff_id = int(callback_data.split("_")[1])
+        _, tariff_id, sub_id, subscription_type = callback_data.split("_")
+        tariff_id = int(tariff_id)
+        sub_id = int(sub_id)
+        markup = await bot_tools.display_countries(tariff_id, sub_id, subscription_type)
+        title_text = "کشور مورد نظر خودتان را انتخاب نمایید."
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text=title_text,
+            reply_markup=markup,
+            parsmode=ParseMode.HTML,
+        )
+    elif callback_data.startswith("purchase_"):
+        _, tariff_id = callback_data.split("_")
         invoice, markup = await bot_tools.create_invoice(tariff_id)
         await bot_tools.edit_or_send_new(
             chat_id=chat_id,
@@ -170,6 +195,235 @@ async def callback_inline(call: CallbackQuery):
             reply_markup=markup,
             parsmode=ParseMode.HTML,
         )
+    elif callback_data.startswith("addUser") or callback_data.startswith("deductUser"):
+        (
+            action,
+            tariff_id,
+            current_additional_users,
+            current_price,
+            default_user,
+            total_volume,
+        ) = callback_data.split("_")
+        tariff_id = int(tariff_id)
+        current_additional_users = int(current_additional_users)
+        default_user = int(default_user)
+
+        if action == "addUser":
+            if current_additional_users + default_user < NUMBER_OF_ALLOWED_USERS:
+                current_additional_users += 1
+            else:
+                # Notify user that they have reached the maximum limit
+                await bot.answer_callback_query(
+                    call.id,
+                    f"حداکثر تعداد مجاز {NUMBER_OF_ALLOWED_USERS} کاربر می‌باشد.",
+                    show_alert=True,
+                )
+                return  # Stop further processing
+
+        elif action == "deductUser":
+            if current_additional_users > 0:
+                current_additional_users = max(0, current_additional_users - 1)
+            else:
+                # Notify user that they cannot reduce users below zero
+                await bot.answer_callback_query(call.id)
+                return  # Stop further processing
+
+        # Call create_invoice with the updated current_additional_users
+        invoice_text, markup = await bot_tools.create_invoice(
+            tariff_id=tariff_id,
+            current_additional_users=current_additional_users,
+            current_price=Decimal(current_price),
+            additional_volume=int(total_volume),
+        )
+
+        # Update the message with the new invoice
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text=invoice_text,
+            reply_markup=markup,
+            parsmode=ParseMode.HTML,
+        )
+    elif callback_data.startswith("addVolume_") or callback_data.startswith(
+        "deductVolume_"
+    ):
+        (
+            action,
+            tariff_id,
+            total_volume,
+            current_price,
+            current_additional_users,
+        ) = callback_data.split("_")
+        tariff_id = int(tariff_id)
+        total_volume = int(total_volume)
+
+        if action == "addVolume":
+            total_volume += 5
+        elif action == "deductVolume":
+            if total_volume > 0:
+                total_volume = max(0, total_volume - 5)
+            else:
+                # Notify user that they cannot reduce users below zero
+                await bot.answer_callback_query(call.id)
+                return  # Stop further processing
+
+        # Call create_invoice with the new adjustment
+        invoice_text, markup = await bot_tools.create_invoice(
+            tariff_id,
+            current_additional_users=int(current_additional_users),
+            current_price=Decimal(current_price),
+            additional_volume=total_volume,
+        )
+        # Update the message with the new invoice
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text=invoice_text,
+            reply_markup=markup,
+            parsmode=ParseMode.HTML,
+        )
+    elif callback_data.startswith("paid_"):
+        (
+            _,
+            tariff_id,
+            total_users,
+            total_volume,
+            amount,
+            platform,
+            duration,
+        ) = callback_data.split("_")
+
+        save_purchase_query = "INSERT INTO PurchaseHistory (ChatID, TariffID, Amount) VALUES (%s, %s, %s);"
+
+        purchase_id = await db_utils.execute_query(
+            query=save_purchase_query,
+            params=(chat_id, tariff_id, Decimal(amount)),
+            fetch_last_insert_id=True,
+        )
+        purchase_data = {
+            "tariff_id": int(tariff_id),
+            "users": int(total_users),
+            "volume": int(total_volume),
+            "amount": int(amount),
+            "purchase_id": purchase_id,
+            "platform": platform,
+            "duration": duration,
+        }
+        await set_shared_data(chat_id=chat_id, key="purchase_data", value=purchase_data)
+        prompt_text = (
+            "لطفا عکس رسید خودتان را ارسال نمایید.\n"
+            "در صورتی که منصرف شدید با فشردن دکمه لغو سفارش به منو اصلی بازگردید."
+        )
+        markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="لغو سفارش", callback_data=f"cancelPurchase_{purchase_id}"
+                    )
+                ]
+            ]
+        )
+        await InputPhotoState.wait_for_photo.set()
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id, new_text=prompt_text, reply_markup=markup
+        )
+    elif callback_data.startswith("confirm_payment_"):
+        setting = None
+        try:
+            await bot.answer_callback_query(call.id)
+            user_chat_id = callback_data.split("_")[2]
+            purchase_data = await get_shared_data(
+                chat_id=user_chat_id, key="purchase_data"
+            )
+
+            if not purchase_data:
+                logger.error(f"No purchase data found for chat ID: {user_chat_id}")
+                await bot.answer_callback_query(
+                    call.id, text="اطلاعات خرید یافت نشد.", show_alert=True
+                )
+                return
+            await delete_shared_data(chat_id=user_chat_id, key="purchase_data")
+
+            # Extracting purchase data details
+            tariff_id = purchase_data["tariff_id"]
+            total_users = purchase_data["users"]
+            total_volume = purchase_data["volume"]
+            purchase_id = purchase_data["purchase_id"]
+            platform = purchase_data["platform"]
+            duration = purchase_data["duration"]
+
+            get_server_info_auery = """
+            SELECT
+                Servers.ServerIP, Servers.Username, Servers.Password, Servers.InboundID
+            FROM
+                Servers
+            INNER JOIN
+                Tariffs ON Tariffs.SubscriptionID = Servers.SubscriptionID
+            WHERE
+                Tariffs.TariffID = %s;
+            """
+            update_purchase_status_query = """
+            UPDATE PurchaseHistory SET Status=4 WHERE ChatID=%s;
+            """
+
+            # Database operations
+            await db_utils.execute_query(
+                query=update_purchase_status_query, params=(user_chat_id,)
+            )
+            result = await db_utils.fetch_data(
+                query=get_server_info_auery, params=(tariff_id,), fetch_one=True
+            )
+            # Handling the result
+            if result:
+                url, username, password, inbound_id = result
+                if platform == "xui":
+                    epoch_duration = convert.convert_days_to_epoch(int(duration))
+                    total_volume_bytes = convert.gb_to_bytes(total_volume)
+                    setting = {
+                        "inbound_id": inbound_id,
+                        "email": f"USER-{purchase_id}-{user_chat_id}",
+                        "alter_id": 0,
+                        "limit_ip": total_users,
+                        "total_gb": total_volume_bytes,
+                        "expiry_time": epoch_duration,
+                    }
+
+            else:
+                logger.error(
+                    f"Could not get the server info from tariff id {tariff_id}"
+                )
+                return
+
+            # create user
+            handler = CreateUserFactory.get_create_user_handler(platform)
+            subscription_url = await handler.create_user(
+                chat_id=user_chat_id,
+                url=url,
+                username=username,
+                password=password,
+                settings=setting,
+            )
+            purchase_text = (
+                "🛍️ اطلاعات خرید شما:\n\n"
+                f"🔢 شماره سفارش: {purchase_id}\n"
+                f"💾 حجم: {total_volume} GB\n"
+                f"👥 تعداد کاربر: {total_users}\n"
+                f"🔗 لینک سابسکریپشن:\n{subscription_url}"
+            )
+
+            last_msg_id = await db_utils.get_last_message_id(user_chat_id)
+            await bot.delete_message(chat_id=user_chat_id, message_id=last_msg_id)
+            await bot.send_message(
+                chat_id=user_chat_id,
+                text=purchase_text,
+            )
+            await db_utils.reset_last_message_id(chat_id=user_chat_id)
+
+        except Exception as err:
+            error_detail = traceback.format_exc()
+            logger.error(
+                f"Error in processing payment confirmation: {err}\n{error_detail}"
+            )
+    elif callback_data.startswith("reject_payment_"):
+        pass
     elif callback_data.startswith("faqs"):
         try:
             await bot.answer_callback_query(call.id)
@@ -222,125 +476,6 @@ async def callback_inline(call: CallbackQuery):
             await bot.answer_callback_query(
                 call.id, text="خطایی رخ داده لطفا دوباره تلاش کنید.", show_alert=True
             )
-    elif callback_data.startswith("addUser") or callback_data.startswith("deductUser"):
-        (
-            action,
-            tariff_id,
-            current_additional_users,
-            current_price,
-            default_user,
-            additional_volume,
-        ) = callback_data.split("_")
-        tariff_id = int(tariff_id)
-        current_additional_users = int(current_additional_users)
-        default_user = int(default_user)
-
-        if action == "addUser":
-            if current_additional_users + default_user < NUMBER_OF_ALLOWED_USERS:
-                current_additional_users += 1
-            else:
-                # Notify user that they have reached the maximum limit
-                await bot.answer_callback_query(
-                    call.id,
-                    f"حداکثر تعداد مجاز {NUMBER_OF_ALLOWED_USERS} کاربر می‌باشد.",
-                    show_alert=True,
-                )
-                return  # Stop further processing
-
-        elif action == "deductUser":
-            if current_additional_users > 0:
-                current_additional_users = max(0, current_additional_users - 1)
-            else:
-                # Notify user that they cannot reduce users below zero
-                await bot.answer_callback_query(call.id)
-                return  # Stop further processing
-
-        # Call create_invoice with the updated current_additional_users
-        invoice_text, markup = await bot_tools.create_invoice(
-            tariff_id=tariff_id,
-            current_additional_users=current_additional_users,
-            current_price=Decimal(current_price),
-            additional_volume=int(additional_volume),
-        )
-
-        # Update the message with the new invoice
-        await bot_tools.edit_or_send_new(
-            chat_id=chat_id,
-            new_text=invoice_text,
-            reply_markup=markup,
-            parsmode=ParseMode.HTML,
-        )
-    elif callback_data.startswith("addVolume_") or callback_data.startswith(
-        "deductVolume_"
-    ):
-        (
-            action,
-            tariff_id,
-            additional_volume,
-            current_price,
-            current_additional_users,
-        ) = callback_data.split("_")
-        tariff_id = int(tariff_id)
-        additional_volume = int(additional_volume)
-
-        if action == "addVolume":
-            additional_volume += 1
-        elif action == "deductVolume":
-            if additional_volume > 0:
-                additional_volume = max(0, additional_volume - 1)
-            else:
-                # Notify user that they cannot reduce users below zero
-                await bot.answer_callback_query(call.id)
-                return  # Stop further processing
-
-        # Call create_invoice with the new adjustment
-        invoice_text, markup = await bot_tools.create_invoice(
-            tariff_id,
-            current_additional_users=int(current_additional_users),
-            current_price=Decimal(current_price),
-            additional_volume=additional_volume,
-        )
-        # Update the message with the new invoice
-        await bot_tools.edit_or_send_new(
-            chat_id=chat_id,
-            new_text=invoice_text,
-            reply_markup=markup,
-            parsmode=ParseMode.HTML,
-        )
-    elif callback_data.startswith("paid_"):
-        _, tariff_id, total_users, additional_volume, amount = callback_data.split("_")
-        purchase_data = {
-            "chat_id": chat_id,
-            "tariff_ad": int(tariff_id),
-            "users": int(total_users),
-            "volume": int(additional_volume),
-            "amount": int(amount),
-        }
-        await set_shared_data(chat_id=chat_id, key="purchase_data", value=purchase_data)
-        save_purchase_query = "INSERT INTO PurchaseHistory (ChatID, TariffID, Amount) VALUES (%s, %s, %s);"
-
-        purchase_id = await db_utils.execute_query(
-            query=save_purchase_query,
-            params=(chat_id, tariff_id, Decimal(amount)),
-            fetch_last_insert_id=True,
-        )
-        prompt_text = (
-            "لطفا عکس رسید خودتان را ارسال نمایید.\n"
-            "در صورتی که منصرف شدید با فشردن دکمه لغو سفارش به منو اصلی بازگردید."
-        )
-        markup = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="لغو سفارش", callback_data=f"cancelPurchase_{purchase_id}"
-                    )
-                ]
-            ]
-        )
-        await InputPhotoState.wait_for_photo.set()
-        await bot_tools.edit_or_send_new(
-            chat_id=chat_id, new_text=prompt_text, reply_markup=markup
-        )
     elif callback_data == "NoAction":
         await bot.answer_callback_query(call.id)
     else:
