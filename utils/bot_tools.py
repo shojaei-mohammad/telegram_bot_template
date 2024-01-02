@@ -482,11 +482,13 @@ async def create_invoice(
             # Update the callback data for the buttons
             add_user_btn = InlineKeyboardButton(
                 text="➕",
-                callback_data=f"addUser_{tariff_id}_{current_additional_users}_{new_price}_{users}_{additional_volume}",
+                callback_data=f"addUser_{tariff_id}_{current_additional_users}_{new_price}_"
+                f"{users}_{additional_volume}_{country_id}",
             )
             deduct_user_btn = InlineKeyboardButton(
                 text="➖",
-                callback_data=f"deductUser_{tariff_id}_{current_additional_users}_{new_price}_{users}_{additional_volume}",
+                callback_data=f"deductUser_{tariff_id}_{current_additional_users}_"
+                f"{new_price}_{users}_{additional_volume}_{country_id}",
             )
             markup.add(add_user_btn, add_user_txt_btn, deduct_user_btn)
 
@@ -496,11 +498,13 @@ async def create_invoice(
             )
             add_volume_btn = InlineKeyboardButton(
                 text="➕",
-                callback_data=f"addVolume_{tariff_id}_{additional_volume}_{new_price}_{current_additional_users}",
+                callback_data=f"addVolume_{tariff_id}_{additional_volume}_"
+                f"{new_price}_{current_additional_users}_{country_id}",
             )
             deduct_volume_btn = InlineKeyboardButton(
                 text="➖",
-                callback_data=f"deductVolume_{tariff_id}_{additional_volume}_{new_price}_{current_additional_users}",
+                callback_data=f"deductVolume_{tariff_id}_{additional_volume}_"
+                f"{new_price}_{current_additional_users}_{country_id}",
             )
             markup.add(add_volume_btn, add_volume_txt_btn, deduct_volume_btn)
         if volume is not None:

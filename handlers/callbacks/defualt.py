@@ -206,10 +206,12 @@ async def callback_inline(call: CallbackQuery):
             current_price,
             default_user,
             total_volume,
+            country_id,
         ) = callback_data.split("_")
         tariff_id = int(tariff_id)
         current_additional_users = int(current_additional_users)
         default_user = int(default_user)
+        country_id = int(country_id)
 
         if action == "addUser":
             if current_additional_users + default_user < NUMBER_OF_ALLOWED_USERS:
@@ -234,6 +236,7 @@ async def callback_inline(call: CallbackQuery):
         # Call create_invoice with the updated current_additional_users
         invoice_text, markup = await bot_tools.create_invoice(
             tariff_id=tariff_id,
+            country_id=country_id,
             current_additional_users=current_additional_users,
             current_price=Decimal(current_price),
             additional_volume=int(total_volume),
@@ -255,9 +258,11 @@ async def callback_inline(call: CallbackQuery):
             total_volume,
             current_price,
             current_additional_users,
+            country_id,
         ) = callback_data.split("_")
         tariff_id = int(tariff_id)
         total_volume = int(total_volume)
+        country_id = int(country_id)
 
         if action == "addVolume":
             total_volume += 5
@@ -272,6 +277,7 @@ async def callback_inline(call: CallbackQuery):
         # Call create_invoice with the new adjustment
         invoice_text, markup = await bot_tools.create_invoice(
             tariff_id,
+            country_id,
             current_additional_users=int(current_additional_users),
             current_price=Decimal(current_price),
             additional_volume=total_volume,
