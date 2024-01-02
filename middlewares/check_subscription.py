@@ -1,4 +1,5 @@
 from aiogram import types
+from aiogram.dispatcher.handler import CancelHandler
 from aiogram.dispatcher.middlewares import BaseMiddleware
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -37,7 +38,8 @@ class CheckUserSubscription(BaseMiddleware):
                 new_text=prompt_text,
                 reply_markup=keyboard,
             )
-            return False
+
+            raise CancelHandler()
         return True
 
     async def on_pre_process_callback_query(
