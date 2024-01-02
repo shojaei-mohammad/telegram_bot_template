@@ -14,18 +14,21 @@ Utility Functions:
 - `ask_for_language_selection`: Present the language selection menu to users.
 - `register_user`: Register user details into the database.
 """
+import re
 import traceback
 import uuid
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandStart
+from aiogram.types import ContentType
 from aiogram.utils.exceptions import TelegramAPIError
 
 from data.config import BASE_REFERRAL_LINK
-from database.redis_tools import set_shared_data
+from database.redis_tools import set_shared_data, get_shared_data, delete_shared_data
 from keyboards.inline.main_menu import create_markup
 from loader import dp, bot, db_utils
+from states.wait_for_custom_name import InputCustomName
 from utils.logger import LoggerSingleton
 
 logger = LoggerSingleton.get_logger()
@@ -47,9 +50,6 @@ async def bot_start(message: types.Message, state: FSMContext) -> None:
         None
     """
     chat_id = message.chat.id
-    name = message.chat.first_name
-    last_name = message.chat.last_name
-    username = message.chat.username
     args = message.get_args()
     referrer_id = None
     if args:
@@ -66,6 +66,7 @@ async def bot_start(message: types.Message, state: FSMContext) -> None:
                 chat_id=chat_id, text=menu_text, reply_markup=markup
             )
             await db_utils.store_message_id(chat_id, last_msg.message_id)
+            return
 
         elif message.text == "/start" or str(args).startswith("REF"):
             logger.info(
@@ -95,47 +96,69 @@ async def bot_start(message: types.Message, state: FSMContext) -> None:
                     logger.info(
                         f"Chat-id:{chat_id} started the bot via referral link, Referred By: {referrer_id}"
                     )
-                    await register_user(
-                        chat_id=chat_id,
-                        name=name,
-                        lastname=last_name,
-                        username=username,
-                        referrer_id=referrer_id,
-                    )
-                    menu, text = await create_markup(menu_key="users_main_menu")
-                    last_msg = await bot.send_message(
-                        text=text, chat_id=chat_id, reply_markup=menu
-                    )
-                    await db_utils.store_message_id(
-                        message.chat.id, last_msg.message_id
-                    )
-            else:
-                logger.info("User came in with regullar start")
-                await register_user(
-                    chat_id=chat_id,
-                    name=name,
-                    lastname=last_name,
-                    username=username,
-                    referrer_id=referrer_id,
-                )
-                menu, text = await create_markup(menu_key="users_main_menu")
-                last_msg = await bot.send_message(
-                    text=text, chat_id=chat_id, reply_markup=menu
-                )
-                await db_utils.store_message_id(message.chat.id, last_msg.message_id)
+
+        await message.answer(
+            text="یک نام کاربری دلخواه وارد نمایید. توجه نمایید که نام کاربری باید حتما "
+            "با حروف انگلیسی شروع شود و حداکثر ۱۵ کارکتر باشد."
+        )
+        await InputCustomName.wait_for_photo.set()
 
     except Exception as e:
         error_traceback = traceback.format_exc()
         logger.error(f"An unexpected error occurred: {e}\n{error_traceback}")
 
 
+@dp.message_handler(
+    content_types=ContentType.TEXT, state=InputCustomName.wait_for_photo
+)
+async def handle_custom_name(message: types.Message, state: FSMContext):
+    chat_id = message.chat.id
+    name = message.chat.first_name
+    last_name = message.chat.last_name
+    username = message.chat.username
+    custom_name = message.text
+
+    # Get the referrer id
+    referrer_id = await get_shared_data(chat_id=chat_id, key="referrer_id")
+
+    # clear the shared data
+    await delete_shared_data(chat_id=chat_id, key="referrer_id")
+
+    # Check if the input starts with English letters and has a max length of 15
+    if re.match("^[A-Za-z].{0,14}$", custom_name):
+        await register_user(
+            chat_id=chat_id,
+            name=name,
+            lastname=last_name,
+            username=username,
+            custom_name=custom_name,
+            referrer_id=referrer_id,
+        )
+        menu, text = await create_markup(menu_key="users_main_menu")
+        last_msg = await bot.send_message(text=text, chat_id=chat_id, reply_markup=menu)
+        await db_utils.store_message_id(message.chat.id, last_msg.message_id)
+        await state.finish()
+    else:
+        # Send a message back if the input is invalid
+        await message.reply(
+            "نام کاربری وارد شده صحیح نمی‌باشد. لطفا یک نامی وارد کنید که با حروف انگلیسی شروع شود و "
+            "حداکثر ۱۵ کارکتر داشته باشد."
+        )
+
+
 async def register_user(
-    chat_id: int, name: str, lastname: str, username: str, referrer_id: str = None
+    chat_id: int,
+    name: str,
+    lastname: str,
+    username: str,
+    custom_name: str,
+    referrer_id: str = None,
 ) -> None:
     """
     Register a user in the database.
 
     Args:
+        custom_name(str): User's custome name for thier service.
         chat_id (int): User's chat ID.
         name (str): User's first name.
         lastname (str): User's last name.
@@ -152,8 +175,8 @@ async def register_user(
     try:
         # SQL query to insert a new user into the table
         registration_query = """
-        INSERT INTO BotUsers (ChatID, Name, Lastname, Username, ReferralCode, ReferredBy, ReferralLink)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO BotUsers (ChatID, Name, Lastname, Username, CustomName, ReferralCode, ReferredBy, ReferralLink)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         # Parameters for the SQL query
@@ -162,6 +185,7 @@ async def register_user(
             name,
             lastname,
             username,
+            custom_name,
             referral_code,
             referrer_id,
             referral_link,
