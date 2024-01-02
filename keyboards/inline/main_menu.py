@@ -62,21 +62,31 @@ menu_structure = {
     },
     "how_to's": {
         "text": "سیستم عامل متناسب با دستگاه خودتان را انتخاب نمایید.",
+        "row_width": [2, 2, 1],
         "back": "users_main_menu",
         "menu_type": "user",
         "options": [
-            {"text": "📱 اندروید", "callback_data": "iosGuid"},
-            {"text": "🍎 آیفون", "callback_data": "androidGuid"},
+            {"text": "📱 Android", "callback_data": "androidGuid"},
+            {"text": "📱 IOS", "callback_data": "iosGuid"},
+            {"text": "💻 Mac", "callback_data": "macGuid"},
+            {"text": "💻 Windows", "callback_data": "windowsGuid"},
+            {"text": "🐧 Linux", "callback_data": "linuxGuid"},
         ],
     },
     "faqs": {
         "text": "اول سوالات پرتکرار و بخون و اگه جوابتو پیدا نکردی خوشحال میشیم از طریق پشتیبانی با ما در ارتباط "
         "باشی. همکاران ما در اسرع وقت پاسخگوی شما هستند.",
+        "row_width": [2, 2, 1, 1, 1],
         "back": "users_main_menu",
         "menu_type": "user",
         "options": [
-            {"text": "📱(FAQ) اندروید", "callback_data": "faqs_android"},
-            {"text": "🍎 (FAQ) آیفون", "callback_data": "faqs_ios"},
+            {"text": "📱 (FAQ) Android", "callback_data": "faqs_android"},
+            {"text": "📱 (FAQ) IOS", "callback_data": "faqs_ios"},
+            {"text": "💻 (FAQ) Mac", "callback_data": "faqs_mac"},
+            {"text": "💻 (FAQ) Windows", "callback_data": "faqs_windows"},
+            {"text": "🐧 (FAQ) Linux", "callback_data": "faqs_linux"},
+            {"text": "تست سرعت", "web_app": "https://www.speedtest.net/"},
+            {"text": "🆘 ارسال تیکت", "url": SUPPORT_USERNAME},
         ],
     },
 }
