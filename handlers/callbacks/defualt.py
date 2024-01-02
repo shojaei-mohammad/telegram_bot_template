@@ -32,7 +32,7 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 
-from data.config import NUMBER_OF_ALLOWED_USERS
+from data.config import NUMBER_OF_ALLOWED_USERS, ADMINS
 from database.redis_tools import set_shared_data, get_shared_data, delete_shared_data
 from keyboards.inline.main_menu import menu_structure, create_markup
 from keyboards.inline.my_referral import referral_menu_markup
@@ -138,7 +138,7 @@ async def callback_inline(call: CallbackQuery):
             logger.error(f"Error displaying plans: {e}\n{error_trackback}")
     elif callback_data.startswith("sub_"):
         """
-        Displays all subscription related to limited or unlimited based on user selection
+        Displays all available subscription related to limited or unlimited based on user selection
         """
         sub_id = None
         try:
@@ -175,6 +175,7 @@ async def callback_inline(call: CallbackQuery):
         Display the available counries
         """
         await bot.answer_callback_query(call.id)
+        await bot.answer_callback_query(call.id)
         _, tariff_id, sub_id, subscription_type = callback_data.split("_")
         tariff_id = int(tariff_id)
         sub_id = int(sub_id)
@@ -187,8 +188,10 @@ async def callback_inline(call: CallbackQuery):
             parsmode=ParseMode.HTML,
         )
     elif callback_data.startswith("purchase_"):
-        _, tariff_id = callback_data.split("_")
-        invoice, markup = await bot_tools.create_invoice(tariff_id)
+        _, tariff_id, country_id = callback_data.split("_")
+        invoice, markup = await bot_tools.create_invoice(
+            tariff_id, country_id=country_id
+        )
         await bot_tools.edit_or_send_new(
             chat_id=chat_id,
             new_text=invoice,
@@ -298,6 +301,11 @@ async def callback_inline(call: CallbackQuery):
             params=(chat_id, tariff_id, Decimal(amount)),
             fetch_last_insert_id=True,
         )
+        get_user_name_query = "SELECT CustomName FROM BotUsers WHERE ChatID=%s;"
+        (name,) = await db_utils.fetch_data(
+            query=get_user_name_query, params=(chat_id,), fetch_one=True
+        )
+
         purchase_data = {
             "tariff_id": int(tariff_id),
             "users": int(total_users),
@@ -306,6 +314,7 @@ async def callback_inline(call: CallbackQuery):
             "purchase_id": purchase_id,
             "platform": platform,
             "duration": duration,
+            "name": name,
         }
         await set_shared_data(chat_id=chat_id, key="purchase_data", value=purchase_data)
         prompt_text = (
@@ -349,7 +358,17 @@ async def callback_inline(call: CallbackQuery):
             purchase_id = purchase_data["purchase_id"]
             platform = purchase_data["platform"]
             duration = purchase_data["duration"]
+            name = purchase_data["name"]
 
+            # Notify admins
+            for admin in ADMINS:
+                msg_id = await db_utils.get_last_message_id(chat_id=admin)
+                await bot.delete_message(chat_id=admin, message_id=msg_id)
+                confirm_text = (
+                    "تایید پرداخت\n\n" f"پرداخت با شماره سفارش {purchase_id} تایید شد."
+                )
+                await bot.send_message(chat_id=admin, text=confirm_text)
+                await db_utils.reset_last_message_id(chat_id=admin)
             get_server_info_auery = """
             SELECT
                 Servers.ServerIP, Servers.Username, Servers.Password, Servers.InboundID
@@ -360,14 +379,7 @@ async def callback_inline(call: CallbackQuery):
             WHERE
                 Tariffs.TariffID = %s;
             """
-            update_purchase_status_query = """
-            UPDATE PurchaseHistory SET Status=4 WHERE ChatID=%s;
-            """
 
-            # Database operations
-            await db_utils.execute_query(
-                query=update_purchase_status_query, params=(user_chat_id,)
-            )
             result = await db_utils.fetch_data(
                 query=get_server_info_auery, params=(tariff_id,), fetch_one=True
             )
@@ -379,8 +391,7 @@ async def callback_inline(call: CallbackQuery):
                     total_volume_bytes = convert.gb_to_bytes(total_volume)
                     setting = {
                         "inbound_id": inbound_id,
-                        "email": f"USER-{purchase_id}-{user_chat_id}",
-                        "alter_id": 0,
+                        "email": f"{name}-{purchase_id}-{user_chat_id}",
                         "limit_ip": total_users,
                         "total_gb": total_volume_bytes,
                         "expiry_time": epoch_duration,
@@ -407,6 +418,16 @@ async def callback_inline(call: CallbackQuery):
                 f"💾 حجم: {total_volume} GB\n"
                 f"👥 تعداد کاربر: {total_users}\n"
                 f"🔗 لینک سابسکریپشن:\n{subscription_url}"
+            )
+
+            update_purchase_status_query = """
+            UPDATE PurchaseHistory SET Status=4, SubscriptionURL=%s WHERE PurchaseID=%s;
+            """
+
+            # Database operations
+            await db_utils.execute_query(
+                query=update_purchase_status_query,
+                params=(subscription_url, purchase_id),
             )
 
             last_msg_id = await db_utils.get_last_message_id(user_chat_id)

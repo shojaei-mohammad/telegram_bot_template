@@ -47,12 +47,10 @@ class XUIClient:
     ):
         client_id = str(uuid4())  # Generate a unique ID for the client
         sub_id = client_id.split("-")[4]
-        alter_id = client_id.split("-")[2]
         client_data = {
             "clients": [
                 {
                     "id": client_id,
-                    "alterId": alter_id,
                     "email": email,
                     "limitIp": limit_ip,
                     "totalGB": total_gb,
