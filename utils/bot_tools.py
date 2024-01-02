@@ -291,7 +291,7 @@ async def display_countries(
     """
     # SQL query to fetch distinct countries for a subscription
     get_country_info_query = """
-    SELECT CountryName
+    SELECT CountryID, CountryName
     FROM Countries
     WHERE SubscriptionID = %s;
     """
@@ -304,9 +304,9 @@ async def display_countries(
 
         # Create a markup with buttons for each country
         markup = InlineKeyboardMarkup()
-        for (country_name,) in countries:
+        for country_id, country_name in countries:
             button = InlineKeyboardButton(
-                f"{country_name}", callback_data=f"purchase_{tariff_id}"
+                f"{country_name}", callback_data=f"purchase_{tariff_id}_{country_id}"
             )
             markup.add(button)
 
@@ -383,6 +383,7 @@ def generate_faq_buttons(platform: str) -> InlineKeyboardMarkup:
 
 async def create_invoice(
     tariff_id: int,
+    country_id: int,
     current_additional_users: int = 0,
     current_price: Decimal = None,
     additional_volume: int = 0,
@@ -399,11 +400,16 @@ async def create_invoice(
     INNER JOIN
         Subscriptions ON Tariffs.SubscriptionID = Subscriptions.SubscriptionID
     INNER JOIN
-        Countries ON Tariffs.SubscriptionID = Countries.SubscriptionID
+        Countries ON Tariffs.SubscriptionID = Countries.SubscriptionID AND Countries.CountryID=%s
     WHERE TariffID = %s
     """
     result = await db_utils.fetch_data(
-        query=get_tariff_info_query, params=(tariff_id,), fetch_one=True
+        query=get_tariff_info_query,
+        params=(
+            country_id,
+            tariff_id,
+        ),
+        fetch_one=True,
     )
     if result:
         (
