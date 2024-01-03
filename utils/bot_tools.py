@@ -239,7 +239,7 @@ async def display_tariffs(
     markup = InlineKeyboardMarkup()
     try:
         fetch_tariffs_query = """
-        SELECT TariffID, TariffDescription
+        SELECT TariffID, TariffDescription, Price
         FROM Tariffs
         INNER JOIN Subscriptions ON Tariffs.SubscriptionID = Subscriptions.SubscriptionID
         WHERE Subscriptions.SubscriptionID = %s;
@@ -252,10 +252,10 @@ async def display_tariffs(
             return None  # Return None if no tariffs are found
 
         # Loop through tariffs and add buttons to markup
-        for tariff_id, tariff_name in tariffs:
+        for tariff_id, tariff_name, price in tariffs:
             button = InlineKeyboardButton(
                 f"{tariff_name}",
-                callback_data=f"tariff_{tariff_id}_{sub_id}_{subscription_type}",
+                callback_data=f"tariff_{tariff_id}_{sub_id}_{subscription_type}_{int(price)}",
             )
             markup.add(button)
 
@@ -273,7 +273,7 @@ async def display_tariffs(
 
 
 async def display_countries(
-    tariff_id: int, sub_id: int, subscription_type: str
+    tariff_id: int, sub_id: int, subscription_type: str, price: int
 ) -> InlineKeyboardMarkup:
     """
     Generates a markup of countries for a given subscription ID and tariff ID.
@@ -306,7 +306,8 @@ async def display_countries(
         markup = InlineKeyboardMarkup()
         for country_id, country_name in countries:
             button = InlineKeyboardButton(
-                f"{country_name}", callback_data=f"purchase_{tariff_id}_{country_id}"
+                f"{country_name}",
+                callback_data=f"purchase_{tariff_id}_{country_id}_{price}",
             )
             markup.add(button)
 
@@ -518,6 +519,6 @@ async def create_invoice(
         markup.add(confirm_btn)
         add_return_buttons(
             markup=markup,
-            back_callback=f"tariff_{tariff_id}_{sub_id}_{subscription_type}",
+            back_callback=f"tariff_{tariff_id}_{sub_id}_{subscription_type}_{int(price)}",
         )
         return invoice_text, markup

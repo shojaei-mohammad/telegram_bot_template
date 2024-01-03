@@ -24,6 +24,7 @@ to predefined menus or actions. Unrecognized callback data will trigger a defaul
 """
 import traceback
 from decimal import Decimal
+from uuid import uuid4
 
 from aiogram.types import (
     CallbackQuery,
@@ -176,10 +177,13 @@ async def callback_inline(call: CallbackQuery):
         """
         await bot.answer_callback_query(call.id)
         await bot.answer_callback_query(call.id)
-        _, tariff_id, sub_id, subscription_type = callback_data.split("_")
+        _, tariff_id, sub_id, subscription_type, price = callback_data.split("_")
         tariff_id = int(tariff_id)
         sub_id = int(sub_id)
-        markup = await bot_tools.display_countries(tariff_id, sub_id, subscription_type)
+        price = int(price)
+        markup = await bot_tools.display_countries(
+            tariff_id, sub_id, subscription_type, price
+        )
         title_text = "کشور مورد نظر خودتان را انتخاب نمایید."
         await bot_tools.edit_or_send_new(
             chat_id=chat_id,
@@ -188,16 +192,140 @@ async def callback_inline(call: CallbackQuery):
             parsmode=ParseMode.HTML,
         )
     elif callback_data.startswith("purchase_"):
-        _, tariff_id, country_id = callback_data.split("_")
-        invoice, markup = await bot_tools.create_invoice(
-            tariff_id, country_id=country_id
-        )
-        await bot_tools.edit_or_send_new(
-            chat_id=chat_id,
-            new_text=invoice,
-            reply_markup=markup,
-            parsmode=ParseMode.HTML,
-        )
+        _, tariff_id, country_id, price = callback_data.split("_")
+
+        if int(price) == 0:
+            setting = None
+            check_user_right_query = """
+            SELECT
+                UsedTestAcount
+            FROM
+                BotUsers
+            WHERE
+                ChatID=%s;
+            """
+            (has_right,) = await db_utils.fetch_data(
+                query=check_user_right_query, params=(chat_id,), fetch_one=True
+            )
+            if has_right:
+                await bot.answer_callback_query(
+                    call.id,
+                    text="شما یکبار از این سرویس استفاده کرده‌اید.",
+                    show_alert=True,
+                )
+                return
+            else:
+                try:
+                    get_tariff_info = """
+                    SELECT
+                        Tariffs.TariffName, Tariffs.Duration, Tariffs.Volume,
+                        Subscriptions.NumberOfUsers, Subscriptions.Platform,
+                        Servers.ServerIP, Servers.Username, Servers.Password, Servers.InboundID
+                    FROM
+                        Tariffs
+                    INNER JOIN
+                        Subscriptions ON Subscriptions.SubscriptionID=Tariffs.SubscriptionID
+                    INNER JOIN
+                        Servers ON Servers.SubscriptionID = Tariffs.SubscriptionID
+                    WHERE
+                        Tariffs.TariffID=%s
+                    """
+                    result = await db_utils.fetch_data(
+                        query=get_tariff_info, params=(tariff_id,), fetch_one=True
+                    )
+                    if not result:
+                        await bot.answer_callback_query(
+                            call.id,
+                            text="اطلاعات سفارش یافت نشد. با پشتیبانی تماس بگیرید.",
+                            show_alert=True,
+                        )
+                        return
+                    (
+                        plan_name,
+                        duration,
+                        total_volume,
+                        total_users,
+                        platform,
+                        url,
+                        username,
+                        password,
+                        inbound_id,
+                    ) = result
+                    unique_id = str(uuid4()).split("-")[4]
+
+                    get_user_name_query = (
+                        "SELECT CustomName FROM BotUsers WHERE ChatID=%s;"
+                    )
+                    (name,) = await db_utils.fetch_data(
+                        query=get_user_name_query, params=(chat_id,), fetch_one=True
+                    )
+                    if platform == "xui":
+                        epoch_duration = convert.convert_days_to_epoch(duration)
+                        total_volume_bytes = convert.gb_to_bytes(total_volume)
+                        setting = {
+                            "inbound_id": inbound_id,
+                            "email": f"{name}-{unique_id}-{chat_id}",
+                            "limit_ip": total_users,
+                            "total_gb": total_volume_bytes,
+                            "expiry_time": epoch_duration,
+                        }
+                    else:
+                        logger.error(
+                            f"Could not get the server info from tariff id {tariff_id}"
+                        )
+                        return
+
+                    # create user
+                    handler = CreateUserFactory.get_create_user_handler(platform)
+                    subscription_url = await handler.create_user(
+                        chat_id=chat_id,
+                        url=url,
+                        username=username,
+                        password=password,
+                        settings=setting,
+                    )
+                    formatted_volume = f"{total_volume} GB"
+                    purchase_text = (
+                        "🛍️ اطلاعات خرید شما:\n\n"
+                        f"🔢 شماره سفارش: {unique_id}\n"
+                        f"💾 حجم: {formatted_volume if total_volume != 0 else 'نامحدود'}\n"
+                        f"👥 تعداد کاربر: {total_users}\n"
+                        f"🔗 لینک سابسکریپشن:\n{subscription_url}"
+                    )
+
+                    update_purchase_status_query = """
+                    UPDATE BotUsers SET UsedTestAcount=1 WHERE ChatID=%s;
+                    """
+
+                    # Database operations
+                    await db_utils.execute_query(
+                        query=update_purchase_status_query,
+                        params=(chat_id,),
+                    )
+
+                    last_msg_id = await db_utils.get_last_message_id(chat_id)
+                    await bot.delete_message(chat_id=chat_id, message_id=last_msg_id)
+                    await bot.send_message(
+                        chat_id=chat_id,
+                        text=purchase_text,
+                    )
+                    await db_utils.reset_last_message_id(chat_id=chat_id)
+                except Exception as err:
+                    error_detail = traceback.format_exc()
+                    logger.error(
+                        f"An error ocurred during test user creation. {err}\n{error_detail}"
+                    )
+
+        else:
+            invoice, markup = await bot_tools.create_invoice(
+                tariff_id, country_id=country_id
+            )
+            await bot_tools.edit_or_send_new(
+                chat_id=chat_id,
+                new_text=invoice,
+                reply_markup=markup,
+                parsmode=ParseMode.HTML,
+            )
     elif callback_data.startswith("addUser") or callback_data.startswith("deductUser"):
         (
             action,
