@@ -310,6 +310,12 @@ async def callback_inline(call: CallbackQuery):
                         text=purchase_text,
                     )
                     await db_utils.reset_last_message_id(chat_id=chat_id)
+                    markup, menu_text = await create_markup(menu_key="users_main_menu")
+                    # Send the message with the appropriate menu
+                    last_msg = await bot.send_message(
+                        chat_id=chat_id, text=menu_text, reply_markup=markup
+                    )
+                    await db_utils.store_message_id(chat_id, last_msg.message_id)
                 except Exception as err:
                     error_detail = traceback.format_exc()
                     logger.error(
@@ -566,12 +572,14 @@ async def callback_inline(call: CallbackQuery):
 
             last_msg_id = await db_utils.get_last_message_id(user_chat_id)
             await bot.delete_message(chat_id=user_chat_id, message_id=last_msg_id)
-            await bot.send_message(
-                chat_id=user_chat_id,
-                text=purchase_text,
-            )
+            await bot.send_message(chat_id=user_chat_id, text=purchase_text)
             await db_utils.reset_last_message_id(chat_id=user_chat_id)
-
+            markup, menu_text = await create_markup(menu_key="users_main_menu")
+            # Send the message with the appropriate menu
+            last_msg = await bot.send_message(
+                chat_id=user_chat_id, text=menu_text, reply_markup=markup
+            )
+            await db_utils.store_message_id(user_chat_id, last_msg.message_id)
         except Exception as err:
             error_detail = traceback.format_exc()
             logger.error(
