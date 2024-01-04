@@ -76,7 +76,12 @@ menu_structure = {
     "faqs": {
         "text": "اول سوالات پرتکرار و بخون و اگه جوابتو پیدا نکردی خوشحال میشیم از طریق پشتیبانی با ما در ارتباط "
         "باشی. همکاران ما در اسرع وقت پاسخگوی شما هستند.",
-        "row_width": [2, 2, 1, 1, 1],
+        "row_width": [
+            2,
+            2,
+            1,
+            1,
+        ],
         "back": "users_main_menu",
         "menu_type": "user",
         "options": [
@@ -86,7 +91,6 @@ menu_structure = {
             {"text": "💻 (FAQ) Windows", "callback_data": "faqs_windows"},
             {"text": "🐧 (FAQ) Linux", "callback_data": "faqs_linux"},
             {"text": "⏱ تست سرعت", "web_app": "https://www.speedtest.net/"},
-            {"text": "🆘 ارسال تیکت", "url": SUPPORT_USERNAME},
         ],
     },
 }
