@@ -39,16 +39,16 @@ from loader import config
 SUPPORT_USERNAME = config.SUPPORT_USER_NAME
 menu_structure = {
     "users_main_menu": {
-        "text": "📁 به پنل کاربری خوش آمدید. یکی از موارد زیر را انتخاب کنید.",
+        "text": "🕋 به پنل کاربری خوش آمدید. یکی از موارد زیر را انتخاب کنید.",
         "row_width": [1, 2, 1, 1, 1],
         "menu_type": "user",
         "options": [
-            {"text": "🤑کسب درآمد", "callback_data": "earning"},
-            {"text": "📂 سرویس های من", "callback_data": "my_services"},
-            {"text": "🛍 خرید سرویس", "callback_data": "buy"},
-            {"text": "📚 ‌آموزش‌ها", "callback_data": "how_to's"},
+            # {"text": "🤑کسب درآمد", "callback_data": "earning"},
+            {"text": "🛒 تست رایگان و خرید سرویس", "callback_data": "buy"},
+            {"text": "📚 آموزش فعال‌سازی", "callback_data": "how_to's"},
+            {"text": "🗃 سرویس‌های من", "callback_data": "my_services"},
             {"text": "💬 پشتیبانی", "callback_data": "faqs"},
-            {"text": "🤗 عضویت در کانال", "url": f"{CHANNEL_LINK}"},
+            {"text": "🌰 عضویت در کانال", "url": f"{CHANNEL_LINK}"},
         ],
     },
     "buy": {
@@ -57,7 +57,7 @@ menu_structure = {
         "menu_type": "user",
         "options": [
             {"text": "⏳ حجمی", "callback_data": "buy_limited"},
-            {"text": "♾️ نامحدود", "callback_data": "buy_unlimited"},
+            {"text": "♾ نامحدود", "callback_data": "buy_unlimited"},
         ],
     },
     "how_to's": {
@@ -85,7 +85,7 @@ menu_structure = {
             {"text": "💻 (FAQ) Mac", "callback_data": "faqs_mac"},
             {"text": "💻 (FAQ) Windows", "callback_data": "faqs_windows"},
             {"text": "🐧 (FAQ) Linux", "callback_data": "faqs_linux"},
-            {"text": "تست سرعت", "web_app": "https://www.speedtest.net/"},
+            {"text": "⏱ تست سرعت", "web_app": "https://www.speedtest.net/"},
             {"text": "🆘 ارسال تیکت", "url": SUPPORT_USERNAME},
         ],
     },

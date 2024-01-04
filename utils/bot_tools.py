@@ -513,7 +513,7 @@ async def create_invoice(
         else:
             total_volume = 0
         confirm_btn = InlineKeyboardButton(
-            text="پرداخت کردم",
+            text="✅ پرداخت کردم",
             callback_data=f"paid_{tariff_id}_{total_users}_{total_volume}_{int(new_price)}_{platform}_{duration}",
         )
         markup.add(confirm_btn)
