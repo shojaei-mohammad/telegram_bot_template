@@ -33,7 +33,7 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 
-from data.config import NUMBER_OF_ALLOWED_USERS, ADMINS
+from data import config
 from database.redis_tools import set_shared_data, get_shared_data, delete_shared_data
 from keyboards.inline.main_menu import menu_structure, create_markup
 from keyboards.inline.my_referral import referral_menu_markup
@@ -195,7 +195,6 @@ async def callback_inline(call: CallbackQuery):
         _, tariff_id, country_id, price = callback_data.split("_")
 
         if int(price) == 0:
-            setting = None
             check_user_right_query = """
             SELECT
                 UsedTestAcount
@@ -348,13 +347,13 @@ async def callback_inline(call: CallbackQuery):
         country_id = int(country_id)
 
         if action == "addUser":
-            if current_additional_users + default_user < NUMBER_OF_ALLOWED_USERS:
+            if current_additional_users + default_user < config.NUMBER_OF_ALLOWED_USERS:
                 current_additional_users += 1
             else:
                 # Notify user that they have reached the maximum limit
                 await bot.answer_callback_query(
                     call.id,
-                    f"حداکثر تعداد مجاز {NUMBER_OF_ALLOWED_USERS} کاربر می‌باشد.",
+                    f"حداکثر تعداد مجاز {config.NUMBER_OF_ALLOWED_USERS} کاربر می‌باشد.",
                     show_alert=True,
                 )
                 return  # Stop further processing
@@ -501,7 +500,7 @@ async def callback_inline(call: CallbackQuery):
             name = purchase_data["name"]
 
             # Notify admins
-            for admin in ADMINS:
+            for admin in config.ADMINS:
                 msg_id = await db_utils.get_last_message_id(chat_id=admin)
                 await bot.delete_message(chat_id=admin, message_id=msg_id)
                 confirm_text = (
@@ -622,7 +621,7 @@ async def callback_inline(call: CallbackQuery):
                     ],
                     [
                         InlineKeyboardButton(
-                            text="ارسال تیکت پشتیبانی", callback_data="ticket"
+                            text="ارسال تیکت پشتیبانی", url=config.SUPPORT_USER_NAME
                         )
                     ],
                 ]
