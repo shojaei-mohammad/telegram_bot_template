@@ -91,6 +91,28 @@ def convert_days_to_epoch(expire_days):
     return epoch
 
 
+def convert_epoch_to_days(epoch):
+    """
+    Converts an epoch timestamp in milliseconds to a human-readable datetime.
+
+    Parameters:
+    - epoch_millis (int): Epoch timestamp in milliseconds.
+
+    Returns:
+    - datetime: The datetime representation of the epoch timestamp.
+    """
+
+    # Convert milliseconds to seconds
+    epoch_seconds = epoch / 1000.0
+
+    # Create a datetime object from the seconds
+    return datetime.datetime.fromtimestamp(epoch_seconds)
+
+
 def gb_to_bytes(gb):
     # 1 GB is 1024^3 bytes
     return int(gb * (1024**3))
+
+
+def bytes_to_gb(byte_value):
+    return byte_value / (1024**3)

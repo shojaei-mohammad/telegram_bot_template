@@ -105,7 +105,7 @@ class XUIClient:
                 response_text = await response.json()
                 if response_text["success"]:
                     logger.info(f"User {email} successfully created.")
-                    return subscription_url
+                    return subscription_url, None
                 else:
                     raise ValueError
             else:

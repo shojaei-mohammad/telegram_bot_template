@@ -75,7 +75,7 @@ class HiddifyClient:
                         f"{self.base_url}/{client_id}/#{user_data['name']}"
                     )
                     logger.info(await response.json())
-                    return subscription_link
+                    return subscription_link, client_id
 
                 else:
                     logger.error(

@@ -43,7 +43,7 @@ class XUIPanel(IPanel):
             client = XUIClient(base_url=url)
 
             # Add a new client with the specified settings
-            sub_url = await client.add_client(
+            sub_url, client_id = await client.add_client(
                 username=username,
                 password=password,
                 inbound_id=settings["inbound_id"],
@@ -57,7 +57,7 @@ class XUIPanel(IPanel):
             await client.close()
 
             # Return the subscription URL
-            return sub_url
+            return sub_url, client_id
 
         except Exception as e:
             # Log the exception

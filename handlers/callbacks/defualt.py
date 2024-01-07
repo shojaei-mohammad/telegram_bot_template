@@ -535,7 +535,7 @@ async def callback_inline(call: CallbackQuery):
 
             # create user
             handler = CreateUserFactory.get_create_user_handler(platform)
-            subscription_url = await handler.create_user(
+            subscription_url, client_id = await handler.create_user(
                 chat_id=user_chat_id,
                 url=url,
                 username=username,
@@ -565,12 +565,13 @@ async def callback_inline(call: CallbackQuery):
             """
             await db_utils.execute_query(query=update_server_count, params=(server_id,))
             insert_to_user_sub = """
-            INSERT INTO UserSubscriptions (ChatID, TariffID, UserSubscriptionName, Status)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO UserSubscriptions (ChatID, PurchaseID, TariffID, UserSubscriptionName, Status)
+            VALUES (%s, %s, %s, %s, %s)
             """
+            sub_name = email_name if client_id is None else client_id
             await db_utils.execute_query(
                 query=insert_to_user_sub,
-                params=(user_chat_id, tariff_id, email_name, 1),
+                params=(user_chat_id, purchase_id, tariff_id, sub_name, 1),
             )
 
             # Notify admins
@@ -653,13 +654,20 @@ async def callback_inline(call: CallbackQuery):
                 call.id, text="خطایی رخ داده لطفا دوباره تلاش کنید.", show_alert=True
             )
     elif callback_data == "my_services":
-        await bot.answer_callback_query(call.id)
         service_markup = await bot_tools.display_services(chat_id)
+        if not service_markup:
+            await bot.answer_callback_query(
+                call.id, text="شما سرویس خریداری نکرده‌اید.", show_alert=True
+            )
+            return
+        await bot.answer_callback_query(call.id)
         await bot_tools.edit_or_send_new(
             chat_id=chat_id, new_text="سرویس‌های فعال شما:", reply_markup=service_markup
         )
     elif callback_data.startswith("service_"):
-        _, email_name, tariff_id, platform = callback_data.split("_")
+        print(callback_data)
+        _, tariff_id, sub_name, platform, purchase_id = callback_data.split("_")
+
         tariff_id = int(tariff_id)
         get_server_info_auery = """
         SELECT
@@ -671,22 +679,32 @@ async def callback_inline(call: CallbackQuery):
         WHERE
             Tariffs.TariffID = %s;
         """
+
         server_data = await db_utils.fetch_data(
             query=get_server_info_auery, params=(tariff_id,), fetch_one=True
         )
+
+        get_subacription_url = """
+        SELECT SubscriptionURL FROM PurchaseHistory WHERE PurchaseID=%s;
+        """
+        (sub_url,) = await db_utils.fetch_data(
+            query=get_subacription_url, params=(purchase_id,), fetch_one=True
+        )
+
         if not server_data:
             logger.error(f"Could not retrive the server info")
             return
         url, username, password = server_data
 
-        if platform == "xui":
-            handler = await CreateServiceFactory.get_service_detail_handler(platform)
-            handler.show_detail(
-                chat_id=chat_id, username=username, password=password, url=url
-            )
-        else:
-            logger.error(f"Could not get the server info from tariff id {tariff_id}")
-            return
+        handler = CreateServiceFactory.get_service_detail_handler(platform)
+        await handler.show_detail(
+            chat_id=chat_id,
+            client_name=sub_name,
+            subscription_url=sub_url,
+            username=username,
+            password=password,
+            url=url,
+        )
 
     elif callback_data == "NoAction":
         await bot.answer_callback_query(call.id)

@@ -371,12 +371,13 @@ async def display_services(chat_id) -> InlineKeyboardMarkup:
         SELECT 
             us.TariffID,
             us.UserSubscriptionName,
-            t.TariffName
+            us.PurchaseID,
+            t.TariffName,
             s.Platform
-        FROM 
+        FROM
             UserSubscriptions us
         INNER JOIN 
-            Tariffs t ON t.TariffID = us.TariffID
+            Tariffs t ON t.TariffID = us.TariffID   
         INNER JOIN 
             Subscriptions s ON s.SubscriptionID = t.SubscriptionID
         WHERE 
@@ -390,11 +391,11 @@ async def display_services(chat_id) -> InlineKeyboardMarkup:
         markup = InlineKeyboardMarkup()
 
         if result:
-            for tariff_id, email_name, tariff_name, platform in result:
+            for tariff_id, email_name, purchase_id, tariff_name, platform in result:
                 # Creating a button for each service
                 button = InlineKeyboardButton(
                     f"{tariff_name}",
-                    callback_data=f"service_{tariff_id}_{email_name}_{platform}",
+                    callback_data=f"service_{tariff_id}_{email_name}_{platform}_{purchase_id}",
                 )
                 markup.add(button)
 
