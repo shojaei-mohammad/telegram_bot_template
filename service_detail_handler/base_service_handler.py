@@ -5,14 +5,14 @@ from utils.logger import LoggerSingleton
 logger = LoggerSingleton.get_logger()
 
 
-class IPanel:
+class IServiceDetail:
     @abstractmethod
-    async def create_user(
+    async def show_detail(
         self,
         chat_id,
+        client_name: str,
         url: str,
         username: str,
         password: str,
-        settings: dict,
     ):
         raise NotImplementedError("This method should be overridden in subclasses.")

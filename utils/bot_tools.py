@@ -352,6 +352,66 @@ def load_faqs():
         raise
 
 
+async def display_services(chat_id) -> InlineKeyboardMarkup:
+    """
+    Asynchronously retrieves active services for a given chat ID and generates an inline keyboard markup.
+
+    Args:
+        chat_id (int/str): The unique identifier for a chat.
+
+    Returns:
+        InlineKeyboardMarkup: A markup of inline keyboard buttons, each representing an active service.
+
+    Raises:
+        Exception: If an error occurs during database query or data processing.
+    """
+
+    # SQL query to fetch active services based on chat_id
+    get_services_query = """
+        SELECT 
+            us.TariffID,
+            us.UserSubscriptionName,
+            t.TariffName
+            s.Platform
+        FROM 
+            UserSubscriptions us
+        INNER JOIN 
+            Tariffs t ON t.TariffID = us.TariffID
+        INNER JOIN 
+            Subscriptions s ON s.SubscriptionID = t.SubscriptionID
+        WHERE 
+            us.Status = 'active'
+            AND us.ChatID = %s;
+    """
+
+    try:
+        # Fetching data from the database
+        result = await db_utils.fetch_data(query=get_services_query, params=(chat_id,))
+        markup = InlineKeyboardMarkup()
+
+        if result:
+            for tariff_id, email_name, tariff_name, platform in result:
+                # Creating a button for each service
+                button = InlineKeyboardButton(
+                    f"{tariff_name}",
+                    callback_data=f"service_{tariff_id}_{email_name}_{platform}",
+                )
+                markup.add(button)
+
+            # Adding return buttons to the markup
+            add_return_buttons(
+                markup=markup, back_callback="users_main_menu", include_main_menu=False
+            )
+
+        return markup
+
+    except Exception as e:
+        # Logging the exception
+        error_detail = traceback.format_exc()
+        logger.error(f"Error in display_services: {e}\nDetails:{error_detail}")
+        raise
+
+
 def generate_faq_buttons(platform: str) -> InlineKeyboardMarkup:
     """
     Generates inline keyboard buttons for FAQs based on the specified platform.
@@ -522,3 +582,44 @@ async def create_invoice(
             back_callback=f"tariff_{tariff_id}_{sub_id}_{subscription_type}_{int(price)}",
         )
         return invoice_text, markup
+
+
+async def find_least_loaded_server(tariff_id):
+    """
+    Finds and returns the least loaded server based on the user count for a given tariff ID.
+
+    Args:
+        tariff_id (int): The Tariff ID to match servers with.
+
+    Returns:
+        dict: A dictionary containing the server details (IP, username, password, inbound ID) of the least loaded server.
+    """
+
+    get_server_info_query = """
+    SELECT
+        Servers.ServerID, Servers.ServerIP, Servers.Username, Servers.Password, Servers.InboundID
+    FROM
+        Servers
+    INNER JOIN
+        Tariffs ON Tariffs.SubscriptionID = Servers.SubscriptionID
+    WHERE
+        Tariffs.TariffID = %s
+    ORDER BY
+        Servers.UserCount ASC
+    LIMIT 1;
+    """
+
+    result = await db_utils.fetch_data(
+        query=get_server_info_query, params=(tariff_id,), fetch_one=True
+    )
+
+    if result:
+        return {
+            "ServerID": result[0],
+            "ServerIP": result[1],
+            "Username": result[2],
+            "Password": result[3],
+            "InboundID": result[4],
+        }
+    else:
+        return None  # or handle the case where no server is found

@@ -73,6 +73,84 @@ menu_structure = {
             {"text": "🐧 Linux", "callback_data": "linuxGuid"},
         ],
     },
+    "iosGuid": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "how_to's",
+        "menu_type": "user",
+        "options": [
+            {"text": "Streisand", "callback_data": "guid_streisandIos"},
+            {"text": "V2Box", "callback_data": "guid_V2BoxIos"},
+            {"text": "FoXray", "callback_data": "guid_FoXrayIos"},
+        ],
+    },
+    "macGuid": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "how_to's",
+        "menu_type": "user",
+        "options": [
+            {"text": "Streisand", "callback_data": "guid_streisandMac"},
+            {"text": "V2Box", "callback_data": "guid_V2BoxMac"},
+            {"text": "FoXray", "callback_data": "guid_FoXrayMac"},
+        ],
+    },
+    "androidGuid": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "how_to's",
+        "menu_type": "user",
+        "options": [
+            {"text": "V2rayNG", "callback_data": "guid_V2rayNG"},
+        ],
+    },
+    "windowsGuid": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "how_to's",
+        "menu_type": "user",
+        "options": [
+            {"text": "win 10+ 64-bit", "callback_data": "win10x64"},
+            {"text": "win 7 64-bit", "callback_data": "win7x64"},
+            {"text": "win 7 32-bit", "callback_data": "win7x86"},
+        ],
+    },
+    "win10x64": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "windowsGuid",
+        "menu_type": "user",
+        "options": [
+            {"text": "Nekoray", "callback_data": "guid_NekorayWin10"},
+        ],
+    },
+    "win7x64": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "windowsGuid",
+        "menu_type": "user",
+        "options": [
+            {"text": "Nekoray", "callback_data": "guid_NekorayWin7"},
+        ],
+    },
+    "win7x86": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "windowsGuid",
+        "menu_type": "user",
+        "options": [
+            {"text": "V2rayN", "callback_data": "guid_V2rayN"},
+        ],
+    },
+    "linuxGuid": {
+        "text": "نرم افزار دلخواهتان را انتخاب نمایید.",
+        "row_width": [1, 1, 1],
+        "back": "windowsGuid",
+        "menu_type": "user",
+        "options": [
+            {"text": "Nekoray", "callback_data": "guid_NekorayLinux"},
+        ],
+    },
     "faqs": {
         "text": "اول سوالات پرتکرار و بخون و اگه جوابتو پیدا نکردی خوشحال میشیم از طریق پشتیبانی با ما در ارتباط "
         "باشی. همکاران ما در اسرع وقت پاسخگوی شما هستند.",

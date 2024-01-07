@@ -38,8 +38,9 @@ from database.redis_tools import set_shared_data, get_shared_data, delete_shared
 from keyboards.inline.main_menu import menu_structure, create_markup
 from keyboards.inline.my_referral import referral_menu_markup
 from loader import bot, dp, db_utils
+from service_detail_handler.factory import CreateServiceFactory
+from service_handler.factory import CreateUserFactory
 from states.wait_for_payment_receipt import InputPhotoState
-from user_handler.factory import CreateUserFactory
 from utils import bot_tools
 from utils import converters as convert
 from utils.logger import LoggerSingleton
@@ -229,10 +230,10 @@ async def callback_inline(call: CallbackQuery):
                     WHERE
                         Tariffs.TariffID=%s
                     """
-                    result = await db_utils.fetch_data(
+                    server_data = await db_utils.fetch_data(
                         query=get_tariff_info, params=(tariff_id,), fetch_one=True
                     )
-                    if not result:
+                    if not server_data:
                         await bot.answer_callback_query(
                             call.id,
                             text="اطلاعات سفارش یافت نشد. با پشتیبانی تماس بگیرید.",
@@ -249,7 +250,7 @@ async def callback_inline(call: CallbackQuery):
                         username,
                         password,
                         inbound_id,
-                    ) = result
+                    ) = server_data
                     unique_id = str(uuid4()).split("-")[4]
 
                     get_user_name_query = (
@@ -498,42 +499,32 @@ async def callback_inline(call: CallbackQuery):
             platform = purchase_data["platform"]
             duration = purchase_data["duration"]
             name = purchase_data["name"]
+            email_name = f"{name}-{purchase_id}-{user_chat_id}"
 
-            # Notify admins
-            for admin in config.ADMINS:
-                msg_id = await db_utils.get_last_message_id(chat_id=admin)
-                await bot.delete_message(chat_id=admin, message_id=msg_id)
-                confirm_text = (
-                    "تایید پرداخت\n\n" f"پرداخت با شماره سفارش {purchase_id} تایید شد."
-                )
-                await bot.send_message(chat_id=admin, text=confirm_text)
-                await db_utils.reset_last_message_id(chat_id=admin)
-            get_server_info_auery = """
-            SELECT
-                Servers.ServerIP, Servers.Username, Servers.Password, Servers.InboundID
-            FROM
-                Servers
-            INNER JOIN
-                Tariffs ON Tariffs.SubscriptionID = Servers.SubscriptionID
-            WHERE
-                Tariffs.TariffID = %s;
-            """
+            server_data = await bot_tools.find_least_loaded_server(tariff_id)
+            inbound_id = server_data.get("InboundID")
+            url = server_data.get("ServerIP")
+            username = server_data.get("Username")
+            password = server_data.get("Password")
+            server_id = server_data.get("ServerID")
+            epoch_duration = convert.convert_days_to_epoch(int(duration))
 
-            result = await db_utils.fetch_data(
-                query=get_server_info_auery, params=(tariff_id,), fetch_one=True
-            )
             # Handling the result
-            if result:
-                url, username, password, inbound_id = result
+            if server_data:
                 if platform == "xui":
-                    epoch_duration = convert.convert_days_to_epoch(int(duration))
                     total_volume_bytes = convert.gb_to_bytes(total_volume)
                     setting = {
                         "inbound_id": inbound_id,
-                        "email": f"{name}-{purchase_id}-{user_chat_id}",
+                        "email": email_name,
                         "limit_ip": total_users,
                         "total_gb": total_volume_bytes,
                         "expiry_time": epoch_duration,
+                    }
+                elif platform == "hiddify":
+                    setting = {
+                        "name": email_name,
+                        "usage_limit_GB": total_volume,
+                        "package_days": duration,
                     }
 
             else:
@@ -568,6 +559,29 @@ async def callback_inline(call: CallbackQuery):
                 query=update_purchase_status_query,
                 params=(subscription_url, purchase_id),
             )
+
+            update_server_count = """
+            UPDATE Servers Set UserCount = UserCount + 1 WHERE ServerID =%s
+            """
+            await db_utils.execute_query(query=update_server_count, params=(server_id,))
+            insert_to_user_sub = """
+            INSERT INTO UserSubscriptions (ChatID, TariffID, UserSubscriptionName, Status)
+            VALUES (%s, %s, %s, %s)
+            """
+            await db_utils.execute_query(
+                query=insert_to_user_sub,
+                params=(user_chat_id, tariff_id, email_name, 1),
+            )
+
+            # Notify admins
+            for admin in config.ADMINS:
+                msg_id = await db_utils.get_last_message_id(chat_id=admin)
+                await bot.delete_message(chat_id=admin, message_id=msg_id)
+                confirm_text = (
+                    "تایید پرداخت\n\n" f"پرداخت با شماره سفارش {purchase_id} تایید شد."
+                )
+                await bot.send_message(chat_id=admin, text=confirm_text)
+                await db_utils.reset_last_message_id(chat_id=admin)
 
             last_msg_id = await db_utils.get_last_message_id(user_chat_id)
             await bot.delete_message(chat_id=user_chat_id, message_id=last_msg_id)
@@ -638,6 +652,42 @@ async def callback_inline(call: CallbackQuery):
             await bot.answer_callback_query(
                 call.id, text="خطایی رخ داده لطفا دوباره تلاش کنید.", show_alert=True
             )
+    elif callback_data == "my_services":
+        await bot.answer_callback_query(call.id)
+        service_markup = await bot_tools.display_services(chat_id)
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id, new_text="سرویس‌های فعال شما:", reply_markup=service_markup
+        )
+    elif callback_data.startswith("service_"):
+        _, email_name, tariff_id, platform = callback_data.split("_")
+        tariff_id = int(tariff_id)
+        get_server_info_auery = """
+        SELECT
+            Servers.ServerIP, Servers.Username, Servers.Password
+        FROM
+            Servers
+        INNER JOIN
+            Tariffs ON Tariffs.SubscriptionID = Servers.SubscriptionID
+        WHERE
+            Tariffs.TariffID = %s;
+        """
+        server_data = await db_utils.fetch_data(
+            query=get_server_info_auery, params=(tariff_id,), fetch_one=True
+        )
+        if not server_data:
+            logger.error(f"Could not retrive the server info")
+            return
+        url, username, password = server_data
+
+        if platform == "xui":
+            handler = await CreateServiceFactory.get_service_detail_handler(platform)
+            handler.show_detail(
+                chat_id=chat_id, username=username, password=password, url=url
+            )
+        else:
+            logger.error(f"Could not get the server info from tariff id {tariff_id}")
+            return
+
     elif callback_data == "NoAction":
         await bot.answer_callback_query(call.id)
     else:

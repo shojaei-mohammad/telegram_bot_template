@@ -18,9 +18,9 @@ class XUIPanel(IPanel):
         self,
         chat_id,
         url: str,
-        username: str,
-        password: str,
-        settings: dict,
+        username: str = None,
+        password: str = None,
+        settings: dict = None,
     ):
         """
         Creates a user in the XUI panel.
@@ -42,11 +42,10 @@ class XUIPanel(IPanel):
             # Initialize the XUI client with the provided base URL
             client = XUIClient(base_url=url)
 
-            # Log in to the XUI panel
-            await client.login(username, password)
-
             # Add a new client with the specified settings
             sub_url = await client.add_client(
+                username=username,
+                password=password,
                 inbound_id=settings["inbound_id"],
                 email=settings["email"],
                 limit_ip=settings["limit_ip"],
