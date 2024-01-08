@@ -9,8 +9,9 @@ logger = LoggerSingleton.get_logger()
 
 
 class HiddifyClient:
-    def __init__(self, base_url: str):
-        self.base_url = f"{base_url}"
+    def __init__(self, base_url: str, admin_key: str):
+        self.base_url = f"{base_url}/{admin_key}"
+        self.admin_key = admin_key
         self.session = None
 
     async def _create_session(self):
@@ -38,7 +39,8 @@ class HiddifyClient:
 
     async def get_user_detail(self, uuid):
         await self._create_session()
-        url = f"{self.base_url}/user/?uuid={uuid}"
+        url = f"{self.base_url}/api/v1/user/?uuid={uuid}"
+        print(url)
         try:
             async with self.session.get(url) as response:
                 if response.status == 200:
@@ -54,19 +56,21 @@ class HiddifyClient:
             logger.error(f"Exception during get_user_by_uuid: {e}")
             raise
 
-    async def add_client(self, admin_uuid, user_data):
+    async def add_client(self, chat_id, user_data):
         await self._create_session()
         client_id = str(uuid4())  # Generate a unique ID for the client
         start_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        url = f"{self.base_url}/{admin_uuid}/api/v1/user/"
+        url = f"{self.base_url}/api/v1/user/"
         payload = {
             "uuid": client_id,
             "name": user_data["name"],
+            "added_by_uuid": self.admin_key,
             "current_usage_GB": 0,
             "usage_limit_GB": int(user_data["usage_limit_GB"]),
             "package_days": user_data["package_days"],
             "start_date": start_date,
             "mode": "no_reset",
+            "telegram_id": chat_id,
         }
         try:
             async with self.session.post(url, json=payload) as response:

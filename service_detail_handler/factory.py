@@ -1,4 +1,5 @@
 from utils.logger import LoggerSingleton
+from .hiddify_service_detail import HiddifyServiceDetail
 from .xui_service_detail import XUIServiceDetail
 
 logger = LoggerSingleton.get_logger()
@@ -30,6 +31,8 @@ class CreateServiceFactory:
         if platform == "xui":
             # Return an instance of the XUIPanel for 'xui' platform
             return XUIServiceDetail()
+        elif platform == "hiddify":
+            return HiddifyServiceDetail()
         else:
             # Log the case where the platform is not recognized
             logger.info(f"The platform could not be identified, Platform: {platform}")

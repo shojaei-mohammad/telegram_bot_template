@@ -286,11 +286,11 @@ async def callback_inline(call: CallbackQuery):
                     )
                     formatted_volume = f"{total_volume} GB"
                     purchase_text = (
-                        "🛍️ اطلاعات خرید شما:\n\n"
-                        f"🔢 شماره سفارش: {unique_id}\n"
-                        f"💾 حجم: {formatted_volume if total_volume != 0 else 'نامحدود'}\n"
+                        "🛒 اطلاعات خرید شما:\n\n"
+                        f"🧾 شماره‌ی سفارش: {unique_id}\n"
+                        f"🔋 حجم: {formatted_volume if total_volume != 0 else 'نامحدود'}\n"
                         f"👥 تعداد کاربر: {total_users}\n"
-                        f"🔗 لینک سابسکریپشن:\n{subscription_url}"
+                        f"🔗 لینک اشتراک:\n{subscription_url}"
                     )
 
                     update_purchase_status_query = """
@@ -456,6 +456,7 @@ async def callback_inline(call: CallbackQuery):
             "duration": duration,
             "name": name,
         }
+
         await set_shared_data(chat_id=chat_id, key="purchase_data", value=purchase_data)
         prompt_text = (
             "لطفا عکس رسید خودتان را ارسال نمایید.\n"
@@ -543,11 +544,12 @@ async def callback_inline(call: CallbackQuery):
                 settings=setting,
             )
             purchase_text = (
-                "🛍️ اطلاعات خرید شما:\n\n"
-                f"🔢 شماره سفارش: {purchase_id}\n"
-                f"💾 حجم: {total_volume} GB\n"
+                "✅ پرداخت شما تکمیل شد. ممنون از اعتماد شما\n\n"
+                "🛒 اطلاعات خرید شما:\n\n"
+                f"🧾 شماره‌ی سفارش: {purchase_id}\n"
+                f"🔋 حجم: {total_volume} GB\n"
                 f"👥 تعداد کاربر: {total_users}\n"
-                f"🔗 لینک سابسکریپشن:\n{subscription_url}"
+                f"🔗 لینک اشتراک:\n{subscription_url}"
             )
 
             update_purchase_status_query = """
@@ -662,10 +664,11 @@ async def callback_inline(call: CallbackQuery):
             return
         await bot.answer_callback_query(call.id)
         await bot_tools.edit_or_send_new(
-            chat_id=chat_id, new_text="سرویس‌های فعال شما:", reply_markup=service_markup
+            chat_id=chat_id,
+            new_text="🌰 سرویس‌های فعال شما:",
+            reply_markup=service_markup,
         )
     elif callback_data.startswith("service_"):
-        print(callback_data)
         _, tariff_id, sub_name, platform, purchase_id = callback_data.split("_")
 
         tariff_id = int(tariff_id)
@@ -705,6 +708,63 @@ async def callback_inline(call: CallbackQuery):
             password=password,
             url=url,
         )
+    elif callback_data.startswith("guid_"):
+        guid_key = callback_data.split("_")[1]
+        get_guids_data_query = """
+        SELECT
+            AppLink, GuidLink, GuidType, Platform
+        FROM
+            Guids
+        WHERE
+            GuidKey=%s;
+        """
+        results = await db_utils.fetch_data(
+            query=get_guids_data_query, params=(guid_key,), fetch_one=True
+        )
+        if not results:
+            await bot.answer_callback_query(
+                call.id, "اطلاعات یافت نشد.", show_alert=True
+            )
+            error_detail = traceback.format_exc()
+            logger.error(
+                f"Could not retrive the guid info for key: {guid_key}\nDetail:{error_detail}"
+            )
+            return
+        app_link, guid_link, guid_type, platform = results
+        markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="ویدیو آموزش راه‌اندازی",
+                        url=guid_link,
+                    )
+                ],
+                [InlineKeyboardButton(text="دانلود برنامه", url=app_link)],
+            ]
+        )
+        bot_tools.add_return_buttons(markup, back_callback=platform)
+        await bot_tools.edit_or_send_new(
+            chat_id=chat_id,
+            new_text="یکی از موارد زیر رو انتخاب کنید.",
+            reply_markup=markup,
+        )
+    elif callback_data.startswith("getGuid_"):
+        _, guid_message_id, guid_type = callback_data.split("_")
+        print(guid_type, guid_message_id)
+
+        # Check the type of the guide and send the appropriate response
+        if guid_type == "video":
+            # Send a video
+            await bot.send_video(
+                chat_id=chat_id,
+                video="https://t.me/nutcrackerinstructions/3",
+            )
+        elif guid_type == "doc":
+            # Send a document
+            await bot.send_document(chat_id=chat_id, document=guide_content)
+        else:
+            # Handle unknown guide type
+            await bot.send_message(chat_id=chat_id, text="Unknown guide type.")
 
     elif callback_data == "NoAction":
         await bot.answer_callback_query(call.id)

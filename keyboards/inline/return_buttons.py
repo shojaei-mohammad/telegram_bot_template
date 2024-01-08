@@ -23,7 +23,7 @@ def add_return_buttons(
 
     # Add a 'Back' button with the provided callback data
     if back_callback is not None:
-        back_button = InlineKeyboardButton("↩️ بازگشت", callback_data=back_callback)
+        back_button = InlineKeyboardButton("🔙 بازگشت", callback_data=back_callback)
         markup.add(back_button)
 
     # Optionally add a 'Main Menu' button

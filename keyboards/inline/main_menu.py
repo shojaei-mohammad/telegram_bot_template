@@ -52,7 +52,7 @@ menu_structure = {
         ],
     },
     "buy": {
-        "text": "📁 به پنل کاربری خوش آمدید. یکی از موارد زیر را انتخاب کنید.",
+        "text": "یکی از موارد زیر را انتخاب کنید.",
         "back": "users_main_menu",
         "menu_type": "user",
         "options": [
@@ -61,14 +61,14 @@ menu_structure = {
         ],
     },
     "how_to's": {
-        "text": "سیستم عامل متناسب با دستگاه خودتان را انتخاب نمایید.",
+        "text": "سیستم‌عامل متناسب با دستگاه خودتان را انتخاب نمایید.",
         "row_width": [2, 2, 1],
         "back": "users_main_menu",
         "menu_type": "user",
         "options": [
+            {"text": "📱 iOS", "callback_data": "iosGuid"},
             {"text": "📱 Android", "callback_data": "androidGuid"},
-            {"text": "📱 IOS", "callback_data": "iosGuid"},
-            {"text": "💻 Mac", "callback_data": "macGuid"},
+            {"text": "💻 macOS", "callback_data": "macGuid"},
             {"text": "💻 Windows", "callback_data": "windowsGuid"},
             {"text": "🐧 Linux", "callback_data": "linuxGuid"},
         ],
@@ -81,7 +81,7 @@ menu_structure = {
         "options": [
             {"text": "Streisand", "callback_data": "guid_streisandIos"},
             {"text": "V2Box", "callback_data": "guid_V2BoxIos"},
-            {"text": "FoXray", "callback_data": "guid_FoXrayIos"},
+            {"text": "Fair", "callback_data": "guid_Fair"},
         ],
     },
     "macGuid": {

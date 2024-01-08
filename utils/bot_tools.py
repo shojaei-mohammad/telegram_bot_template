@@ -624,3 +624,29 @@ async def find_least_loaded_server(tariff_id):
         }
     else:
         return None  # or handle the case where no server is found
+
+
+async def send_post_content_to_user(user_chat_id, channel_link, message_id):
+    # Extract channel username from the link
+    channel_username = channel_link.split("/")[3]
+    print(channel_username)
+
+    try:
+        # Fetch the message from the channel
+        message = await bot.get_chat(chat_id=channel_username).get_message(message_id)
+
+        # Check the type of content and send it to the user
+        if message.text:
+            await bot.send_message(chat_id=user_chat_id, text=message.text)
+        elif message.photo:
+            await bot.send_photo(chat_id=user_chat_id, photo=message.photo[-1].file_id)
+        elif message.video:
+            await bot.send_video(chat_id=user_chat_id, video=message.video.file_id)
+        elif message.document:
+            await bot.send_document(
+                chat_id=user_chat_id, document=message.document.file_id
+            )
+        # Add more conditions for other types of content if needed
+
+    except Exception as e:
+        print(f"Error sending message content: {e}")

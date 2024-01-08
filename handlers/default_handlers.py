@@ -140,8 +140,8 @@ async def handle_receipt_photo(message: types.Message, state: FSMContext):
 
         # Notify the user about the photo receipt and ongoing processing
         user_notification_msg = (
-            "✅ رسید شما دریافت شد. همکاران ما به زودی آن را بررسی میکنند."
-            " در صورت صحت پرداخت خرید شما به صورت خودکار انجام خواهد شد و تنظیمات را دریافت خواهد کرد."
+            "✅ رسید شما دریافت شد. همکاران ما به‌زودی آن را بررسی می‌کنند."
+            " در صورت صحت پرداخت، خرید شما به صورت خودکار انجام خواهد شد و تنظیمات را دریافت خواهید کرد."
         )
         await edit_or_send_new(chat_id=chat_id, new_text=user_notification_msg)
 

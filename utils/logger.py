@@ -48,7 +48,7 @@ class LoggerSingleton:
             "%(asctime)s - %(levelname)s - %(message)s", "%Y-%m-%d %H:%M:%S"
         )
         rotating_handler = RotatingFileHandler(
-            log_file, maxBytes=1024 * 1024, backupCount=5
+            log_file, maxBytes=5 * 1024 * 1024, backupCount=10
         )
         rotating_handler.setFormatter(log_formatter)
 
