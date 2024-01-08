@@ -44,6 +44,7 @@ class XUIPanel(IPanel):
 
             # Add a new client with the specified settings
             sub_url, client_id = await client.add_client(
+                chat_id=chat_id,
                 username=username,
                 password=password,
                 inbound_id=settings["inbound_id"],

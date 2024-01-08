@@ -70,6 +70,7 @@ class XUIClient:
 
     async def add_client(
         self,
+        chat_id,
         username,
         password,
         inbound_id,
@@ -92,6 +93,8 @@ class XUIClient:
                     "expiryTime": expiry_time,
                     "enable": enable,
                     "subId": sub_id,
+                    "tgId": chat_id,
+                    "reset": 0,
                 }
             ]
         }
