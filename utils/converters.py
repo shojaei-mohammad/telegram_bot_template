@@ -91,6 +91,29 @@ def convert_days_to_epoch(expire_days):
     return epoch
 
 
+def calculate_expiry_epoch_after_first_use(days):
+    """
+    Calculates the epoch value representing the expiry date set a specific number of days after first use.
+
+    The calculation is based on a predefined relationship where each day corresponds to a fixed negative value.
+    This negative value is used as a special code to signify the number of days after first use for expiry.
+    The function multiplies the number of days by this fixed negative value to calculate the epoch value.
+
+    Parameters:
+    - days (int): The number of days after first use for the expiry.
+
+    Returns:
+    - int: The calculated epoch value for the expiry date.
+
+    Example:
+    >>> calculate_expiry_epoch_after_first_use(10)
+    # Returns -864000000 for an expiry 10 days after first use.
+    """
+
+    value_per_day = -86400000
+    return value_per_day * days
+
+
 def convert_epoch_to_days(epoch):
     """
     Converts an epoch timestamp in milliseconds to a human-readable datetime.

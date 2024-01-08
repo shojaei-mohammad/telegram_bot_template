@@ -508,7 +508,9 @@ async def callback_inline(call: CallbackQuery):
             username = server_data.get("Username")
             password = server_data.get("Password")
             server_id = server_data.get("ServerID")
-            epoch_duration = convert.convert_days_to_epoch(int(duration))
+            epoch_duration = convert.calculate_expiry_epoch_after_first_use(
+                int(duration)
+            )
 
             # Handling the result
             if server_data:
@@ -748,23 +750,6 @@ async def callback_inline(call: CallbackQuery):
             new_text="یکی از موارد زیر رو انتخاب کنید.",
             reply_markup=markup,
         )
-    elif callback_data.startswith("getGuid_"):
-        _, guid_message_id, guid_type = callback_data.split("_")
-        print(guid_type, guid_message_id)
-
-        # Check the type of the guide and send the appropriate response
-        if guid_type == "video":
-            # Send a video
-            await bot.send_video(
-                chat_id=chat_id,
-                video="https://t.me/nutcrackerinstructions/3",
-            )
-        elif guid_type == "doc":
-            # Send a document
-            await bot.send_document(chat_id=chat_id, document=guide_content)
-        else:
-            # Handle unknown guide type
-            await bot.send_message(chat_id=chat_id, text="Unknown guide type.")
 
     elif callback_data == "NoAction":
         await bot.answer_callback_query(call.id)
