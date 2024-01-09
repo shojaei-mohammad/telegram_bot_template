@@ -56,6 +56,45 @@ async def close_redis():
             raise
 
 
+async def set_shared_data(
+    chat_id: int,
+    key: str,
+    value: Any,
+    cache_time: int = 86400,
+    persistent: bool = False,
+) -> None:
+    """
+    Store data associated with a chat_id and key in Redis with an optional expiration time.
+
+    Args:
+        chat_id (int): Identifier for the chat session.
+        key (str): The key under which data is stored.
+        value (Any): The data to be stored.
+        cache_time (int, optional): Expiration time in seconds. Defaults to 86400 seconds (24 hours).
+        persistent (bool, optional): If True, the data will be persistent and not expire. Defaults to False.
+
+    Raises:
+        aioredis.RedisError: If there's an issue setting data in Redis.
+    """
+    redis_key = f"{chat_id}:{key}"
+    try:
+        serialized_value = json.dumps(value)
+        if persistent:
+            await redis.set(redis_key, serialized_value)
+            logger.info(f"Persistently set data for key '{redis_key}'")
+        else:
+            await redis.setex(redis_key, cache_time, serialized_value)
+            logger.info(
+                f"Set data for key '{redis_key}' with expiration of {cache_time} seconds"
+            )
+    except aioredis.RedisError as e:
+        logger.error(f"Error setting data for key '{redis_key}': {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error when setting data for key '{redis_key}': {e}")
+        raise
+
+
 async def get_shared_data(chat_id: int, key: str) -> Optional[Any]:
     """
     Fetch data associated with a chat_id and key from Redis.
