@@ -56,38 +56,6 @@ async def close_redis():
             raise
 
 
-async def set_shared_data(
-    chat_id: int,
-    key: str,
-    value: Any,
-    cache_time: int = 86400,
-    persistent: bool = False,
-) -> None:
-    """
-    Store data associated with a chat_id and key in Redis with an optional expiration time.
-
-    Args:
-        chat_id (int): Identifier for the chat session.
-        key (str): The key under which data is stored.
-        value (Any): The data to be stored.
-        cache_time (int, optional): Expiration time in seconds. Defaults to 86400 seconds (24 hours).
-        persistent (bool, optional): If True, the data will be persistent and not expire. Defaults to False.
-
-    Raises:
-        aioredis.RedisError: If there's an issue setting data in Redis.
-    """
-    redis_key = f"{chat_id}:{key}"
-    try:
-        serialized_value = json.dumps(value)
-        if persistent:
-            await redis.set(redis_key, serialized_value)
-        else:
-            await redis.setex(redis_key, cache_time, serialized_value)
-    except aioredis.RedisError as e:
-        logger.error(f"Error setting data for key '{redis_key}': {e}")
-        raise
-
-
 async def get_shared_data(chat_id: int, key: str) -> Optional[Any]:
     """
     Fetch data associated with a chat_id and key from Redis.
@@ -107,10 +75,16 @@ async def get_shared_data(chat_id: int, key: str) -> Optional[Any]:
         value = await redis.get(redis_key)
         if value is not None:
             deserialized_value = json.loads(value.decode("utf-8"))
+            logger.info(f"Fetched data for key '{redis_key}'")
             return deserialized_value
-        return None
+        else:
+            logger.info(f"No data found for key '{redis_key}'")
+            return None
     except aioredis.RedisError as e:
         logger.error(f"Error fetching data for key '{redis_key}': {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error when fetching data for key '{redis_key}': {e}")
         raise
 
 
@@ -130,13 +104,20 @@ async def delete_shared_data(chat_id: int, key: Optional[str] = None) -> None:
         if key:
             redis_key = f"{chat_id}:{key}"
             await redis.delete(redis_key)
+            logger.info(f"Deleted data for key '{redis_key}'")
         else:
             keys = await redis.keys(f"{chat_id}:*")
             for k in keys:
                 await redis.delete(k)
+            logger.info(f"Deleted all data for chat_id '{chat_id}'")
     except aioredis.RedisError as e:
         logger.error(
             f"Error deleting data for chat_id '{chat_id}' and key '{key}': {e}"
+        )
+        raise
+    except Exception as e:
+        logger.error(
+            f"Unexpected error when deleting data for chat_id '{chat_id}' and key '{key}': {e}"
         )
         raise
 
