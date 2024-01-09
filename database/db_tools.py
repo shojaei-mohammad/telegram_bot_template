@@ -95,15 +95,16 @@ class DBUtil:
         :return: None, the last inserted ID, or a list of last inserted IDs if in batch mode.
         """
         async with self.pool.acquire() as conn:
-            if is_transaction:
+            if is_transaction or batch_mode:
                 await conn.begin()
             async with conn.cursor() as cursor:
                 try:
                     if batch_mode and batch_params:
-                        await cursor.executemany(query, batch_params)
-                        logger.info(
-                            f"Batch executing query: {query} with params: {batch_params}"
-                        )
+                        for batch_query, batch_param in batch_params:
+                            await cursor.execute(batch_query, batch_param)
+                            logger.info(
+                                f"Executing batch query: {batch_query} with params: {batch_param}"
+                            )
                     else:
                         await cursor.execute(query, params)
                         logger.info(f"Running query: {query} with params: {params}")
@@ -113,6 +114,7 @@ class DBUtil:
 
                     if fetch_last_insert_id:
                         if batch_mode:
+                            # If batch_mode is True, this might need to be adjusted based on your logic
                             return [
                                 cursor.lastrowid for _ in batch_params
                             ]  # List of IDs
@@ -122,7 +124,7 @@ class DBUtil:
                     logger.error(
                         f"An error occurred while executing the query: {e}\n{traceback.format_exc()}"
                     )
-                    if is_transaction:
+                    if is_transaction or batch_mode:
                         await conn.rollback()
                     raise
 

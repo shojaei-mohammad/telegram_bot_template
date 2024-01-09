@@ -564,28 +564,41 @@ async def callback_inline(call: CallbackQuery):
                 f"🔗 لینک اشتراک:\n{subscription_url}"
             )
 
+            # Step 1: Prepare batch queries
+            batch_queries = []
+
+            # Update PurchaseHistory
             update_purchase_status_query = """
             UPDATE PurchaseHistory SET Status=4, SubscriptionURL=%s WHERE PurchaseID=%s;
             """
-
-            # Database operations
-            await db_utils.execute_query(
-                query=update_purchase_status_query,
-                params=(subscription_url, purchase_id),
+            batch_queries.append(
+                (update_purchase_status_query, (subscription_url, purchase_id))
             )
 
+            # Update Server count
             update_server_count = """
-            UPDATE Servers Set UserCount = UserCount + 1 WHERE ServerID =%s
+            UPDATE Servers SET UserCount = UserCount + 1 WHERE ServerID = %s
             """
-            await db_utils.execute_query(query=update_server_count, params=(server_id,))
+            batch_queries.append((update_server_count, (server_id,)))
+
+            # Insert into UserSubscriptions
             insert_to_user_sub = """
             INSERT INTO UserSubscriptions (ChatID, PurchaseID, TariffID, UserSubscriptionName, Status)
             VALUES (%s, %s, %s, %s, %s)
             """
             sub_name = email_name if client_id is None else client_id
+            batch_queries.append(
+                (
+                    insert_to_user_sub,
+                    (user_chat_id, purchase_id, tariff_id, sub_name, 1),
+                )
+            )
+
+            # Step 2: Execute batch queries
             await db_utils.execute_query(
-                query=insert_to_user_sub,
-                params=(user_chat_id, purchase_id, tariff_id, sub_name, 1),
+                query=None,  # Not used in batch mode
+                batch_mode=True,
+                batch_params=batch_queries,
             )
 
             # Notify admins
