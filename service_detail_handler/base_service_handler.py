@@ -10,6 +10,7 @@ class IServiceDetail:
     async def show_detail(
         self,
         chat_id,
+        title: str,
         subscription_url: str,
         client_name: str,
         url: str,

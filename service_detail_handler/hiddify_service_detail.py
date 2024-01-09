@@ -15,6 +15,7 @@ class HiddifyServiceDetail(IServiceDetail):
     async def show_detail(
         self,
         chat_id,
+        title,
         subscription_url: str,
         client_name: str,
         url: str,
@@ -25,6 +26,7 @@ class HiddifyServiceDetail(IServiceDetail):
         Displays detailed information about a Hiddify service subscription.
 
         Args:
+            title: short explnation about the service
             chat_id: The chat ID where the message should be sent.
             subscription_url: URL of the subscription.
             client_name: Name of the client for whom details are being fetched.
@@ -57,6 +59,7 @@ class HiddifyServiceDetail(IServiceDetail):
 
             # Create the service text message
             service_text = (
+                f"{title}\n\n"
                 f"📧 نام کاربری: {client_data['name']} \n"
                 f"⏳ حجم مصرف شده: {formatted_used_data} GB\n "
                 f"⏰ تاریخ انقضا: {expire_date_str} \n"

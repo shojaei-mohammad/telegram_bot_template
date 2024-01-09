@@ -13,6 +13,7 @@ class XUIServiceDetail(IServiceDetail):
     async def show_detail(
         self,
         chat_id,
+        title,
         subscription_url: str,
         client_name: str,
         url: str,
@@ -33,6 +34,7 @@ class XUIServiceDetail(IServiceDetail):
                 convert.convert_epoch_to_days(client_data["expiryTime"])
             )
             service_text = (
+                f"{title}\n\n"
                 f"👤 نام کاربری: {client_data['email']} \n"
                 f"⏳ حجم مصرف شده: {total_data_used_gb if total_allowed_data!=0 else 'نامحدود'} \n "
                 f"⏰ تاریخ انقضا: {formmated_date} \n"

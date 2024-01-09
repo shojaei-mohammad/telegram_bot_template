@@ -140,16 +140,26 @@ async def callback_inline(call: CallbackQuery):
             logger.error(f"Error displaying plans: {e}\n{error_trackback}")
     elif callback_data.startswith("sub_"):
         """
-        Displays all available subscription related to limited or unlimited based on user selection
+        Displays all available tariffs related to selected subscription
         """
         sub_id = None
+        get_subscription_title_query = """
+        SELECT
+            SubscriptionDescription
+        FROM
+            Subscriptions
+        WHERE
+            SubscriptionID=%s;
+        """
         try:
             sub_id = int(callback_data.split("_")[1])
             subscription_type = callback_data.split("_")[2]
+            (title,) = await db_utils.fetch_data(
+                query=get_subscription_title_query, params=(sub_id,), fetch_one=True
+            )
             markup = await bot_tools.display_tariffs(sub_id, subscription_type)
             if markup:
                 await bot.answer_callback_query(call.id)
-                title = "توضیحات طرح ها در اینجا قرار میگیرد."
                 await bot_tools.edit_or_send_new(
                     chat_id=chat_id, new_text=title, reply_markup=markup
                 )
@@ -676,7 +686,7 @@ async def callback_inline(call: CallbackQuery):
         tariff_id = int(tariff_id)
         get_server_info_auery = """
         SELECT
-            Servers.ServerIP, Servers.Username, Servers.Password
+            Servers.ServerIP, Servers.Username, Servers.Password, Tariffs.TariffDescription
         FROM
             Servers
         INNER JOIN
@@ -689,6 +699,10 @@ async def callback_inline(call: CallbackQuery):
             query=get_server_info_auery, params=(tariff_id,), fetch_one=True
         )
 
+        if not server_data:
+            logger.error(f"Could not retrive the server info")
+            return
+
         get_subacription_url = """
         SELECT SubscriptionURL FROM PurchaseHistory WHERE PurchaseID=%s;
         """
@@ -696,14 +710,12 @@ async def callback_inline(call: CallbackQuery):
             query=get_subacription_url, params=(purchase_id,), fetch_one=True
         )
 
-        if not server_data:
-            logger.error(f"Could not retrive the server info")
-            return
-        url, username, password = server_data
+        url, username, password, title = server_data
 
         handler = CreateServiceFactory.get_service_detail_handler(platform)
         await handler.show_detail(
             chat_id=chat_id,
+            title=title,
             client_name=sub_name,
             subscription_url=sub_url,
             username=username,
