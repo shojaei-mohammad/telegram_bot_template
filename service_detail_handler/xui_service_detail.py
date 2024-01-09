@@ -25,14 +25,18 @@ class XUIServiceDetail(IServiceDetail):
             client_data = await client.get_user_detail(
                 username=username, password=password, client_name=client_name
             )
+
             total_allowed_data = client_data["total"]
             total_data_used_byte = client_data["up"] + client_data["down"]
             total_data_used_gb = convert.convert_english_digits_to_farsi(
                 str(convert.bytes_to_gb(total_data_used_byte)) + " GB"
             )
-            formmated_date = convert.convert_to_shamsi(
-                convert.convert_epoch_to_days(client_data["expiryTime"])
-            )
+            if client_data["expiryTime"] < 0:
+                formmated_date = "استفاده نشده"
+            else:
+                formmated_date = convert.convert_to_shamsi(
+                    convert.convert_epoch_to_days(client_data["expiryTime"])
+                )
             service_text = (
                 f"{title}\n\n"
                 f"👤 نام کاربری: {client_data['email']} \n"
