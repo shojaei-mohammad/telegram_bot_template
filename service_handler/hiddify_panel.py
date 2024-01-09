@@ -24,5 +24,5 @@ class HiddifyPanel(IPanel):
         except Exception as err:
             error_detail = traceback.format_exc()
             logger.info(
-                f"An error occuraed during hiddify user creation.Error:{err}\nDetails:{error_detail}"
+                f"Error creating user in HiddifyPanel for chat_id {chat_id}: {err}\nDetail:{error_detail}"
             )

@@ -1,6 +1,7 @@
+import traceback
+
 from utils.logger import LoggerSingleton
 from utils.xui import XUIClient
-
 from .base_panel_handler import IPanel
 
 logger = LoggerSingleton.get_logger()
@@ -61,8 +62,11 @@ class XUIPanel(IPanel):
             return sub_url, client_id
 
         except Exception as e:
+            error_detail = traceback.format_exc()
             # Log the exception
-            logger.error(f"Error creating user in XUIPanel for chat_id {chat_id}: {e}")
+            logger.error(
+                f"Error creating user in XUIPanel for chat_id {chat_id}: {e}\nDetail:{error_detail}"
+            )
 
             # Re-raise the exception to be handled by the caller
             raise
