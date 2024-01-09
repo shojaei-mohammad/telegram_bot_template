@@ -75,6 +75,6 @@ class HiddifyServiceDetail(IServiceDetail):
                 chat_id=chat_id, new_text=service_text, reply_markup=markup
             )
             logger.info(f"Service details sent to chat ID {chat_id}")
-
+            await client.close()
         except Exception as e:
             logger.error(f"Error in show_detail: {e}")

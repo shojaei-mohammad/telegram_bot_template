@@ -19,6 +19,7 @@ class HiddifyPanel(IPanel):
         try:
             client = HiddifyClient(base_url=url, admin_key=username)
             sub_url = await client.add_client(chat_id=chat_id, user_data=settings)
+            await client.close()
             return sub_url
         except Exception as err:
             error_detail = traceback.format_exc()

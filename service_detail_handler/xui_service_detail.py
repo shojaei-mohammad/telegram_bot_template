@@ -47,5 +47,6 @@ class XUIServiceDetail(IServiceDetail):
             await edit_or_send_new(
                 chat_id=chat_id, new_text=service_text, reply_markup=markup
             )
+            await client.close()
         except Exception as err:
             print(err)
