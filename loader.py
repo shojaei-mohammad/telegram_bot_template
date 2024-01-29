@@ -16,8 +16,8 @@ Import the desired components (e.g., `bot`, `dp`, `db_utils`) in other modules t
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
-from data import config
-from database.db_tools import DBUtil
+from core.data import config
+from core.database import DBUtil
 
 # Create an instance of the DBUtil class to provide utilities
 # for performing operations with the MySQL database.
